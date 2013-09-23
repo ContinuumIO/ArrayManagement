@@ -27,3 +27,22 @@ Tools for working and ingesting different types of arrays.  This will be wrapped
 
 ### Advanced Blaze Features
 - full blaze expression graph evaluation over remote data
+
+## Some Technical Details
+- Metadata search system, built on top of [ejdb](http://ejdb.org/) 
+  (we can replace this with sqlite if ejdb isn't stable or mature enough)
+- Data Ingest
+  - Some data formats require an intermediate representation (csv/json should be parsed and saved to hdf5)
+    - These will be written to a __init__.hdf5 file 
+  - Other formats require no intermediate representation.  We will try to do the right thing heuristically, by 
+    looking at extensions, but people can customize settings using the config
+  - load.py can be dropped into the directory - load.py, if dropped in will determine how to parse/load data for this path
+  - load.py for now, writes results into an __init__.hdf5 file, which we know how to understand
+  - config.py can specify a configuration for the directory
+  - config.py should propagate to directory children, load.py does not, unless the config asks it to.
+- Data Slicing
+  - We support basic numpy style slicing, column selections for all array types.  
+  - We support more sophisticated stuff for blaze/dynd
+- Data computation
+  - for pandas data, we just ship the entire dataframe (after any slicing has been done)
+  - For blaze, we do expression graph stuff
