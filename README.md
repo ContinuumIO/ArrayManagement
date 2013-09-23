@@ -40,6 +40,10 @@ Tools for working and ingesting different types of arrays.  This will be wrapped
   - load.py for now, writes results into an __init__.hdf5 file, which we know how to understand
   - config.py can specify a configuration for the directory
   - config.py should propagate to directory children, load.py does not, unless the config asks it to.
+  - functions.py provide data access functions.  We will provide some utilities to easily build functions which will:
+    - parameterize sql queries
+    - cache the results in __init__.hdf5 files
+    - compute the parameterized results from the hdf5 cache
 - Data Slicing
   - We support basic numpy style slicing, column selections for all array types.  
   - We support more sophisticated stuff for blaze/dynd
