@@ -34,6 +34,7 @@ Tools for working and ingesting different types of arrays.  This will be wrapped
 - Data Ingest
   - Some data formats require an intermediate representation (csv/json should be parsed and saved to hdf5)
     - These will be written to a __init__.hdf5 file 
+
   - Other formats require no intermediate representation.  We will try to do the right thing heuristically, by 
     looking at extensions, but people can customize settings using the config
   - load.py can be dropped into the directory - load.py, if dropped in will determine how to parse/load data for this path
