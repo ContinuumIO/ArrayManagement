@@ -29,8 +29,9 @@ Tools for working and ingesting different types of arrays.  This will be wrapped
 - full blaze expression graph evaluation over remote data
 
 ## Some Technical Details
-- Metadata search system, built on top of [ejdb](http://ejdb.org/) 
-  (we can replace this with sqlite if ejdb isn't stable or mature enough)
+- Metadata search system, built on top of [databag](https://github.com/nod/databag).  Databag is a json
+  store with mongo style queries, built on top of sqlite.  I was considering [ejdb](http://ejdb.org/), however
+  I'd rather not add non-python dependencies if we don't need them.
 - Data Ingest
   - Some data formats require an intermediate representation (csv/json should be parsed and saved to hdf5)
     - These will be written to a __init__.hdf5 file 
