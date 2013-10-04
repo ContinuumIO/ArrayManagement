@@ -1,0 +1,2 @@
+class ArrayManagementException(Exception):
+    pass

@@ -1,34 +1,41 @@
 import os
-from os.path import basename, splitext, join
+from os.path import basename, splitext, join, isdir, relpath
 import posixpath
+import pandas as pd
 
-def keys(urlpath, relpath, basepath, config):
-    """return keys for a given location
-    urlpath : urlpath to this location
-    relpath : file path to this location from relative to basepath
-    basepath : file system path to the root of the tree
-    config : instance of arraymanagement.config.NodeConfig
-    ----
-    returns : list of dicts, where dicts specify information about the different types
-    of data that live in this part of the hierarchy
-    """
-    fnames = os.listdir(path)
-    ks = [{'name' : basename(x), 'extension' : splitext(x), 'filename' : x} for x in fnames]
-    for k in ks:
-        if k['extension'] in config.get('csv_exts'):
-            k['type'] = 'csv'
-            k['csv_reader'] = config.get('csv_reader')
-            k['csv_options'] = config.get('csv_options')
-            k['urlpath'] = posixpath.join(urlpath, k['name'])
-            k['abs_file_path'] = join(basepath, relpath, k['filename'])
+from .exceptions import ArrayManagementException
+from nodes import csvnodes
+from nodes import hdfnodes
+from nodes import dirnodes
+import sys
 
-        elif k['extension'] in config.get('hdf5_exts') and \
-                k['filename'] != config.get('array_cache'):
-            k['type'] = 'hdf5'
-            k['hdf5_type'] = config.get('hdf5_type')
-            k['urlpath'] = posixpath.join(urlpath, k['name'])
-            k['abs_file_path'] = join(basepath, relpath, k['filename'])
-
-        elif k['filename'] == config.get('array_cache'):
-            pass
+def keys(urlpath, rpath, basepath, config):
+    fnames = os.listdir(join(basepath, rpath))
+    ks = [basename(x) for x in fnames]
     
+def get_node(urlpath, rpath, basepath, config):
+    """
+    urlpath : to the resource you are seeking
+    rpath : path to this directory
+    basepath : basepath of directory tree
+    """
+    abspath = join(basepath, rpath)
+    key = posixpath.basename(urlpath)
+    files = os.listdir(abspath)
+    files = [x for x in files if splitext(x)[0] == key]
+    if len (files) > 1:
+        raise ArrayManagementException, 'multile files matching %s: %s' % (key, str(files))
+    fname = files[0]
+    new_abspath = join(abspath, fname)
+    new_rpath = relpath(new_abspath, basepath)
+    if isdir(new_abspath):
+        new_config = config.clone_and_update(new_rpath)
+        return dirnodes.DirectoryNode(urlpath, new_rpath, basepath, new_config, 
+                                      mod=sys.modules[__name__])
+    prefix, extension = splitext(new_abspath)
+    if extension in config.get('csv_exts'):
+        return csvnodes.PandasCSVNode(urlpath, new_rpath, basepath, config)
+    elif extension in config.get('hdf5_exts'):
+        return hdfnodes.PandasHDFNode(urlpath, new_rpath, basepath, config)
+    else:
+        return None
