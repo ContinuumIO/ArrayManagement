@@ -3,7 +3,7 @@ from .hdfnodes import HDFDataSetMixin
 import pandas as pd
 from os.path import basename, splitext, join, dirname
 
-class PandasCSVNode(PandasCacheable, HDFDataSetMixin):
+class PandasCSVNode(PandasCacheable):
     is_group = False
     def _get_data(self):
         fname = join(self.basepath, self.relpath)
