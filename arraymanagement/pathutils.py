@@ -1,4 +1,5 @@
-from os.path import join, dirname, split, realpath, exists
+from os.path import join, dirname, split, realpath, exists, abspath
+import imp
 import posixpath
 from serializations import jsload
 
@@ -35,20 +36,30 @@ def dirsplit(path, basepath, maxdepth=10):
     basepath = realpath(basepath)
     return _dirsplit(path, basepath, maxdepth=maxdepth)
 
-def get_config(path):
-    fpath = join(path, "config.json")
+# def get_config(path):
+#     fpath = join(path, "config.json")
+#     if exists(fpath):
+#         return jsload(fpath)
+#     else:
+#         return {}
+        
+def get_config(relpath, basepath):
+    fpath = abspath(join(basepath, relpath, 'config.py'))
     if exists(fpath):
-        return jsload(fpath)
+        directories = dirsplit(relpath, basepath)
+        name = "_".join(directories)
+        name += "_config"
+        mod = imp.load_source(name, fpath)
+        return mod.__dict__
     else:
         return {}
-        
 def recursive_config_load(path, basepath):
     """recursively loads configs as we traverse from basepath to path
     """
     incremental_paths = dirsplit(path, basepath)
-    config = get_config(basepath)
+    config = get_config(basepath, basepath)
     for idx in range(len(incremental_paths)):
         currpath = join(basepath, *incremental_paths[:idx + 1])
-        conf = get_config(currpath)
+        conf = get_config(currpath, basepath)
         config.update(conf)
     return config

@@ -7,12 +7,28 @@ from .exceptions import ArrayManagementException
 from nodes import csvnodes
 from nodes import hdfnodes
 from nodes import dirnodes
+from nodes import sql
 import sys
 
 def keys(urlpath, rpath, basepath, config):
     fnames = os.listdir(join(basepath, rpath))
-    ks = [basename(x) for x in fnames]
-    
+    ks = []
+    for fname in fnames:
+        if isdir(join(basepath, rpath, fname)):
+           ks.append(fname)
+           continue
+        prefix, extension = splitext(fname)
+        if extension in config.get('csv_exts'):
+            ks.append(prefix)
+            continue
+        elif extension in config.get('hdf5_exts'):
+            ks.append(prefix)
+            continue
+        elif extension in config.get('sql_exts'):
+            ks.append(prefix)
+            continue
+    return ks
+
 def get_node(urlpath, rpath, basepath, config):
     """
     urlpath : to the resource you are seeking
@@ -37,5 +53,9 @@ def get_node(urlpath, rpath, basepath, config):
         return csvnodes.PandasCSVNode(urlpath, new_rpath, basepath, config)
     elif extension in config.get('hdf5_exts'):
         return hdfnodes.PandasHDFNode(urlpath, new_rpath, basepath, config)
+    elif extension in config.get('sql_exts'):
+        with open(new_abspath, 'r') as f:
+            query = f.read()
+        return sql.SimpleQueryTable(urlpath, new_rpath, basepath, config, query=query)
     else:
         return None

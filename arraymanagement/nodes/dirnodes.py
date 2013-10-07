@@ -11,8 +11,8 @@ class DirectoryNode(Node):
         loadpath = join(basepath, relpath, "load.py")
         if exists(loadpath):
             directories = pathutils.dirsplit(relpath, basepath)
-            name = ".".join(directories)
-            name += ".load"
+            name = "_".join(directories)
+            name += "_load"
             self.mod = imp.load_source(name, loadpath)
         else:
             self.mod = mod
