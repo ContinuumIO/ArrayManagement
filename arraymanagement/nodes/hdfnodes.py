@@ -43,6 +43,8 @@ def write_pandas_hdf_from_cursor(store, localpath, cursor, columns, min_itemsize
     min_item_padding, for computed min_item_sizes, we will multiply by padding to give
     ourselves some buffer
     """
+    logger.debug("writing data to %s with %s columns %s min_itemsize", 
+                 localpath, columns, min_itemsize)
     if replace:
         if localpath in store:
             store.remove(localpath)
@@ -166,6 +168,7 @@ class PandasCacheableTable(PandasCacheable):
                      min_item_padding=self.min_item_padding,
                      chunksize=500000, 
                      replace=True)
+        self.store.flush()
     def select(self, *args, **kwargs):
         self.load_data(force=kwargs.pop('force', None))
         return self.store.select(self.localpath, *args, **kwargs)
@@ -182,7 +185,8 @@ class PandasCacheableFixed(PandasCacheable):
         data = self._get_data()
         logger.debug("GOT DATA with shape %s, writing to pytables", data.shape)
         self.store.put(self.localpath, data)
-        self.inmemory_cache[self.localpath] = self.store.get(self.localpath)
+        self.inmemory_cache[self.localpath] = data
+        self.store.flush()
         return data
 
     def get(self, *args, **kwargs):
