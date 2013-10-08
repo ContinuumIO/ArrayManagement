@@ -47,6 +47,7 @@ class SimpleQueryTable(PandasCacheableTable):
         cur = self.execute_query()
         logger.debug("query returned!")
         columns, min_itemsize, dt_fields = self.query_info(cur)
+        self.min_itemsize = min_itemsize
         logger.debug("queryinfo %s", str((columns, min_itemsize, dt_fields)))
         if batch:
             logger.debug("batching results!")
@@ -57,4 +58,22 @@ class SimpleQueryTable(PandasCacheableTable):
                                      min_item_padding=self.min_item_padding,
                                      chunksize=50000, 
                                      replace=True)
+        self.store.flush()
 
+class SimpleParameterizedQueryTable(SimpleQueryTable):
+    @property
+    def query(self):
+        key = posixpath.basename(self.urlpath)
+        return self._query % key
+
+    @query.setter
+    def querysetter(self, val):
+        self._query = val
+
+    def execute_query(self):
+        key = posixpath.basename(self.urlpath)
+        mod = self.config.get('db_module')
+        with mod.connect(*self.config.get('db_conn_args')) as db:
+            cur = db.cursor()
+            cur.execute(self.query)
+            return cur
