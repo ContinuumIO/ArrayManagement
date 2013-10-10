@@ -4,6 +4,8 @@ from . import Node
 from .. import pathutils
 
 import imp
+import logging
+logger = logging.getLogger(__name__)
 
 class DirectoryNode(Node):
     def __init__(self, urlpath, relpath, basepath, config, mod=None):
@@ -22,6 +24,7 @@ class DirectoryNode(Node):
     
     def get_node(self, key):
         urlpath = posixpath.join(self.urlpath, key)
+        logger.debug("retrieving url %s", urlpath)
         return self.mod.get_node(urlpath, self.relpath, self.basepath, self.config)
 
     

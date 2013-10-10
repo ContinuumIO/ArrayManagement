@@ -16,8 +16,16 @@ class Node(object):
         self.basepath = basepath
         self.config = config
         self.absolute_file_path = join(basepath, relpath)
+        self.key = posixpath.basename(urlpath)
 
     def __getitem__(self, k):
         return self.get_node(k)
     def __repr__(self):
         return ":".join([self.__class__.__name__, self.urlpath, self.relpath])
+
+    def joinpath(self, path):
+        return posixpath.normpath(posixpath.join(self.urlpath, path))
+
+    @property
+    def c(self):
+        return self.config.client

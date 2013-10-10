@@ -6,6 +6,7 @@ import math
 
 import pandas as pd
 import numpy as np
+import datetime as dt
 
 from ..exceptions import ArrayManagementException
 from . import Node
@@ -34,9 +35,23 @@ def get_pandas_hdf5(path):
         store = pd.HDFStore(path, complib='blosc')
         pandas_hdf5_cache[path] = store
     return store
-
-def write_pandas_hdf_from_cursor(store, localpath, cursor, columns, min_itemsize, dt_fields,
-                               min_item_padding=1.1, chunksize=500000, replace=True):
+def hack_pandas_ns_issue(col):
+    col[col > dt.datetime(2250,1,1)] = dt.datetime(2250,1,1)
+    col = col.astype('datetime64[ns]')
+    return col
+def override_hdf_types(df, overrides):
+    for dtype, override_cols in overrides.iteritems():
+        for col in override_cols:
+            if col in df:
+                if 'datetime' in dtype:
+                    df[col] = hack_pandas_ns_issue(df[col])
+                else:
+                    df[col] = df[col].astype(dtype)
+    return df
+        
+def write_pandas_hdf_from_cursor(store, localpath, cursor, columns, min_itemsize, 
+                                 dtype_overrides={},
+                                 min_item_padding=1.1, chunksize=500000, replace=True):
     """
     min_itemsize - dict of string columns, to length of string columns.  Cannot specify 'unknown'
     if unknown, we will compute it here
@@ -56,8 +71,7 @@ def write_pandas_hdf_from_cursor(store, localpath, cursor, columns, min_itemsize
         if data:
             df = pd.DataFrame.from_records(data, columns=columns, 
                                            index=index)
-            for dtfield in dt_fields:
-                df[dtfield] = df[dtfield].astype('datetime64[ns]')
+            override_hdf_types(df, dtype_overrides)
             logger.debug("writing rowend %s", global_count)
             store.append(localpath, df, min_itemsize=min_itemsize, 
                          chunksize=chunksize, data_columns=True)
@@ -162,7 +176,7 @@ class PandasCacheableTable(PandasCacheable):
         if not force and self.localpath in store.keys():
             return
         data = self._get_data()
-        logger.debug("GOT DATA with shape %s, writing to pytables", data.shape)
+        logger.debug("GOT DATA with shape %s for %s, writing to pytables", data.shape, self.urlpath)
         write_pandas(self.store, self.localpath, data, 
                      self.min_itemsize, 
                      min_item_padding=self.min_item_padding,

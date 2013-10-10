@@ -46,6 +46,7 @@ class SimpleQueryTable(PandasCacheableTable):
         logger.debug("query executing!")
         cur = self.execute_query()
         logger.debug("query returned!")
+        logger.debug("cursor descr %s", cur.description)
         columns, min_itemsize, dt_fields = self.query_info(cur)
         self.min_itemsize = min_itemsize
         logger.debug("queryinfo %s", str((columns, min_itemsize, dt_fields)))
@@ -53,8 +54,12 @@ class SimpleQueryTable(PandasCacheableTable):
             logger.debug("batching results!")
             cur = cur.fetchall()
             logger.debug("batching done!")
+        overrides = self.config.get('table_type_overrides').get(self.key, {})
+        datetime_type = self.config.get('datetime_type')
+        dt_overrides = overrides.setdefault(datetime_type, [])
+        dt_overrides += dt_fields
         write_pandas_hdf_from_cursor(self.store, self.localpath, cur, columns, self.min_itemsize, 
-                                     dt_fields,
+                                     dtype_overrides=overrides,
                                      min_item_padding=self.min_item_padding,
                                      chunksize=50000, 
                                      replace=True)

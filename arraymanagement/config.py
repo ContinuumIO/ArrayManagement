@@ -1,6 +1,7 @@
 import json
 import os
 from os.path import join, dirname, exists
+import posixpath
 import copy
 
 import databag
@@ -18,13 +19,14 @@ class NodeConfig(object):
     csv_reader = 'pandas'
     array_cache = '__init__.hdf5'
     csv_options = {}
+    table_type_overrides = {}
+    datetime_type = 'datetime64[ns]'
     def __init__(self, path, basepath, config, client):
         self.config = config
         self.path = path
         self.basepath = basepath
         self.md = databag.DataBag(fpath=join(basepath, "__md.db"))
         self.client = client
-
     @classmethod
     def from_paths(cls, path, basepath, client):
         config = recursive_config_load(path, basepath)
