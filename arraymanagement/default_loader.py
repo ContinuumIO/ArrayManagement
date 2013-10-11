@@ -4,30 +4,23 @@ import posixpath
 import pandas as pd
 
 from .exceptions import ArrayManagementException
-from nodes import csvnodes
-from nodes import hdfnodes
+import fnmatch
 from nodes import dirnodes
-from nodes import sql
 import sys
 
 def keys(urlpath, rpath, basepath, config):
     fnames = os.listdir(join(basepath, rpath))
     ks = []
+    loaders = config.get('loaders')
+    names = set()
+    for pattern in loaders:
+        matches = fnmatch.filter(fnames, pattern)
+        matches = [splitext(match)[0] for match in matches]
+        names.update(matches)
     for fname in fnames:
         if isdir(join(basepath, rpath, fname)):
-           ks.append(fname)
-           continue
-        prefix, extension = splitext(fname)
-        if extension in config.get('csv_exts'):
-            ks.append(prefix)
-            continue
-        elif extension in config.get('hdf5_exts'):
-            ks.append(prefix)
-            continue
-        elif extension in config.get('sql_exts'):
-            ks.append(prefix)
-            continue
-    return ks
+            names.add(fname)
+    return list(names)
 
 def get_node(urlpath, rpath, basepath, config):
     """
@@ -49,13 +42,12 @@ def get_node(urlpath, rpath, basepath, config):
         return dirnodes.DirectoryNode(urlpath, new_rpath, basepath, new_config, 
                                       mod=sys.modules[__name__])
     prefix, extension = splitext(new_abspath)
-    if extension in config.get('csv_exts'):
-        return csvnodes.PandasCSVNode(urlpath, new_rpath, basepath, config)
-    elif extension in config.get('hdf5_exts'):
-        return hdfnodes.PandasHDFNode(urlpath, new_rpath, basepath, config)
-    elif extension in config.get('sql_exts'):
-        with open(new_abspath, 'r') as f:
-            query = f.read()
-        return sql.SimpleQueryTable(urlpath, new_rpath, basepath, config, query=query)
-    else:
-        return None
+    loaders = config.get('loaders')
+    pattern_priority = config.get('pattern_priority')
+    for pattern in pattern_priority and loaders:
+        if fnmatch.fnmatch(fname, pattern):
+            return loaders[pattern](urlpath, new_rpath, basepath, config)
+    for pattern in loaders:
+        if fnmatch.fnmatch(fname, pattern):
+            return loaders[pattern](urlpath, new_rpath, basepath, config)
+    return None
