@@ -9,6 +9,7 @@ import numpy as np
 import datetime as dt
 
 from ..exceptions import ArrayManagementException
+from ..pathutils import dirsplit
 from . import Node
 import logging
 logger = logging.getLogger(__name__)
@@ -141,8 +142,7 @@ class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
             return ArrayManagementException, 'This node is not a group'
         keys = self.store.keys()
         keys = [x for x in keys if x.startswith(self.localpath) and x!= self.localpath]
-        keys = [posixpath.relpath(x, self.localpath) for x in keys]
-        keys = [posixpath.basename(x) for x in keys]
+        keys = [dirsplit(x, self.localpath)[0] for x in keys]
         return keys
 
     def get_node(self, key):
@@ -171,7 +171,7 @@ class PandasCacheable(Node):
 class PandasCacheableTable(PandasCacheable):
     min_item_padding = 1.1
     min_itemsize = {}
-    def load_data(self):
+    def load_data(self, force=False):
         store = self._get_store()
         if not force and self.localpath in store.keys():
             return
