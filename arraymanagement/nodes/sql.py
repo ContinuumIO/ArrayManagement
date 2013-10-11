@@ -4,8 +4,6 @@ import pandas as pd
 from pandas.io import sql
 import logging
 
-import cx_Oracle
-
 from arraymanagement.nodes.hdfnodes import PandasCacheableTable, write_pandas_hdf_from_cursor
 
 
