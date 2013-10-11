@@ -1,4 +1,4 @@
-import databag
+#import databag
 import os
 from os.path import join, dirname, isdir, relpath, exists, abspath
 from config import NodeConfig
@@ -11,7 +11,7 @@ import sys
 class ArrayClient(Node):
     #should modify this to inherit from DirectorNode
     def __init__(self, path):
-        self.root = path
+        self.root = abspath(path)
         self.config = NodeConfig.from_paths(self.root, self.root, self)
         if self.root not in sys.path:
             sys.path.append(self.root)
