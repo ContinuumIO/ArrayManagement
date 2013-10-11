@@ -3,14 +3,14 @@ from os.path import join, relpath
 import pandas as pd
 
 from arraymanagement import default_loader
-from arraymanagement.nodes import PandasCacheable
+from arraymanagement.nodes.hdfnodes import PandasCacheableTable
 
 
 keys = default_loader.keys
 
 old_get_node = default_loader.get_node
 
-class MyCSVNode(PandasCacheable):
+class MyCSVNode(PandasCacheableTable):
     is_group = False
     def _get_data(self):
         fname = join(self.basepath, self.relpath)
