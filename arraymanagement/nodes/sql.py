@@ -12,9 +12,15 @@ logger = logging.getLogger(__name__)
 class SimpleQueryTable(PandasCacheableTable):
     is_group = False
     def __init__(self, *args, **kwargs):
-        self.query = kwargs.pop('query')
+        query = None
+        if 'query' in kwargs:
+            query = kwargs.pop('query')
         super(SimpleQueryTable, self).__init__(*args, **kwargs)
-
+        if query:
+            self.query = query
+        else:
+            with open(join(self.basepath, self.relpath)) as f:
+                self.query = f.read()
     def execute_query(self):
         mod = self.config.get('db_module')
         with mod.connect(*self.config.get('db_conn_args')) as db:
