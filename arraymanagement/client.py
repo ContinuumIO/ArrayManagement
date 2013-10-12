@@ -10,6 +10,7 @@ import sys
 
 class ArrayClient(Node):
     #should modify this to inherit from DirectorNode
+    is_group = True
     def __init__(self, path):
         self.root = abspath(path)
         self.config = NodeConfig.from_paths(self.root, self.root, self)

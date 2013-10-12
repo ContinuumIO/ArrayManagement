@@ -20,8 +20,15 @@ class Node(object):
 
     def __getitem__(self, k):
         return self.get_node(k)
+    
     def __repr__(self):
-        return ":".join([self.__class__.__name__, self.urlpath, self.relpath])
+        info = ["type: %s" % self.__class__.__name__,
+                "urlpath: %s" % self.urlpath,
+                "filepath: %s" % self.relpath]
+        if hasattr(self, 'keys') and self.is_group:
+            info.append('keys: %s' % str(self.keys()))
+        return "\n".join(info)
+
 
     def joinpath(self, path):
         return posixpath.normpath(posixpath.join(self.urlpath, path))

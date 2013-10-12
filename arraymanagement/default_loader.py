@@ -10,6 +10,7 @@ import sys
 
 def keys(urlpath, rpath, basepath, config):
     fnames = os.listdir(join(basepath, rpath))
+    fnames = [x for x in fnames if not (x.startswith('cache') and x.endswith('hdf5'))]
     ks = []
     loaders = config.get('loaders')
     names = set()

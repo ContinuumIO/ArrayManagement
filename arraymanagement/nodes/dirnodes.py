@@ -8,6 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class DirectoryNode(Node):
+    is_group = True
     def __init__(self, urlpath, relpath, basepath, config, mod=None):
         super(DirectoryNode, self).__init__(urlpath, relpath, basepath, config)
         loadpath = join(basepath, relpath, "load.py")

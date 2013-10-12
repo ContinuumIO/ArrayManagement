@@ -4,8 +4,316 @@ ArrayManagement
 Tools for working and ingesting different types of arrays.  This will be wrapped by a variety of servers 
 [http](https://github.com/ContinuumIO/blaze-web), ZeroMQ, etc..
 
+## Current design/architecture
 
-## Features
+The behavior can be summed up in a few main points
+
+- This library provides an automatic way of constructing 
+python objects to represent directories and files in the file system, 
+csv files are turned into arrays, sql queries are turned into arrays, 
+directories are turned into groups, containing other arrays.  A url path identifier 
+is used for each object, based on the path to that object on the file system
+
+- Simple customizations for how we map filesystem resources into python objects can be done inside a config.py
+file, which can be dropped anywhere inside the hierarchy.  This directories and files inherit the configurations
+of parent directories.  You can drop more config.py files to get more specific behavior deeper in the file system
+hierarchy
+
+- Advanced customizations can be added by dropping in a `load.py` file.  The `load.py` file defines 2 functions, 
+`keys` (think ls, or dir, or keys of a dictionary), and `get_node`.  
+`get_node` returns some python object for the 
+resource on the file system.  By modifying `keys`, and `get_node`,
+you stick arbitrary python objects into the url hierarchy.  One common use case of this is to return datasets that are derivatives of other datasets (think concatenating a bunch of csv files together).  
+
+- There are a few utility objects right now - which probably need better names
+    - PandasCacheableFixed - an object that can return a dataframe.  This is then cached in hdf5 using pandas
+      fixed format - meaning, you cannot query it using pytables, but you can store things that pytables
+      isn't very good at, like variable length strings
+    - PandasCacheableTable - an object that can return a dataframe, which will then be stored in hdf5 using pandas
+      table format.  This can be queried using PyTables expressions
+    - PandasCSVNode - automatically loads csvs into pandas fixed format, using PandasCacheableFixed
+    - PandasCSVTable - automatically loads csvs into pandas table format, using PandasCacheableTable
+    - DirectorNode - You could customize this, but usually dropping in load.py files are sufficient
+    - SimpleQueryTable - takes a sql query "myquery.sql", executes it, and caches the results in a pandas
+      hdf5 table.
+
+
+## Example Usage
+
+We'll start with the examples directory - here is the filesystem hierarchy of the example directory (with my
+hdf5 cache files, and other distractions like pyc files removed from the list)
+
+
+    In [19]: !find example
+    example
+    example/pandashdf5
+    example/pandashdf5/data.hdf5
+    example/config.py
+    example/csvs
+    example/csvs/sample2.CSV
+    example/csvs/sample.csv
+    example/custom
+    example/custom/load.py
+    example/custom/sample.csv
+
+
+To begin, we construct a Client.
+
+    In [15]: c = ArrayClient('example')
+    
+    In [16]: c
+    Out[16]: 
+    type: ArrayClient
+    urlpath: /
+    filepath: .
+    keys: ['custom', 'pandashdf5', 'csvs']
+    
+    In [17]: ls example
+    config.py  config.pyc  csvs/  custom/  pandashdf5/
+
+
+The contents of the example directory 
+(3 directories, csvs, custom and pandashdf5 are mapped into 3 keys under the root directory.  
+The additional file, config.py, is a configuration file which is used by the various data ingest routines.  
+This configuration is inherited and can be overriden by nested directories by dropping in other config.py files.
+We will begin by looking into the csvs directory.
+
+    In [21]: ls example/csvs
+    cache_sample2.hdf5  cache_sample.hdf5  sample2.CSV  sample.csv
+    
+    In [22]: c['csvs']
+    Out[22]: 
+    type: DirectoryNode
+    urlpath: /csvs
+    filepath: csvs
+    keys: ['sample', 'sample2']
+    
+    In [23]: c['csvs']['sample']
+    Out[23]: 
+    type: PandasCSVNode
+    urlpath: /csvs/sample
+    filepath: csvs/sample.csv
+    
+    In [24]: c['csvs']['sample'].get()
+    Out[24]: 
+    <class 'pandas.core.frame.DataFrame'>
+    Int64Index: 73 entries, 0 to 72
+    Data columns (total 2 columns):
+    data      73  non-null values
+    values    73  non-null values
+    dtypes: int64(1), object(1)
+
+#### Using configs.
+
+The default configuration is setup to load all csv files (those matching `*.csv` or `*.CSV`) 
+using the pandas fixed hdf5 format.  However, inside the example directory, we have added a config.py
+overwriting this mapping for `*.CSV` files - as a result `*.csv` files are still stored in fixed format, however
+`*.CSV` files are stored in table format.  As a result, we can query one CSV, but not the other.
+
+    In [26]: c['csvs']['sample'].get().head()
+    Out[26]: 
+                      data  values
+    0  2013-01-01 00:00:00       0
+    1  2013-01-02 00:00:00       1
+    2  2013-01-03 00:00:00       2
+    3  2013-01-04 00:00:00       3
+    4  2013-01-05 00:00:00       4
+    
+    In [27]: import pandas as pd
+    
+    In [28]: c['csvs']['sample2'].select(where=pd.Term('values','<',3))
+    Out[28]: 
+                      data  values
+    0  2013-01-01 00:00:00       0
+    1  2013-01-02 00:00:00       1
+    2  2013-01-03 00:00:00       2
+
+This is the config file that induces this behavior
+
+    In [8]: !cat example/config.py
+    from arraymanagement.nodes import csvnodes
+    loaders = {
+        '*.CSV' : csvnodes.PandasCSVTable,
+        }
+
+At it's core, the array management library maps python objects/nodes onto the file system.  
+We do this using glob filters.  The config file specifies glob filters of file patterns, 
+which define which class is used to construct the python object representing a resource on disk.
+Currently, there are nodes for pandas hdf5 files, csvs, sql queries, and directories.
+Next lets look inside the pandashdf5 directory
+
+    In [29]: ls example/pandashdf5
+    data.hdf5
+    
+    In [30]: c['pandashdf5']['data']
+    Out[30]: 
+    type: PandasHDFNode
+    urlpath: /pandashdf5/data
+    filepath: pandashdf5/data.hdf5
+    keys: ['sample', 'testgroup']
+    
+    In [31]: c['pandashdf5']['data'].store
+    Out[31]: 
+    <class 'pandas.io.pytables.HDFStore'>
+    File path: /home/hugoshi/work/ArrayManagement/example/pandashdf5/data.hdf5
+    /sample                        frame_table  (typ->appendable,nrows->73,ncols->2,indexers->[index])
+    /testgroup/dataset2            frame        (shape->[1,2])                                        
+
+We have a common url system that can span multiple hdf5 files, and reference data inside them.  Inside the 
+pandashdf5 directory, we have a data.hdf5 which has 2 datasets, one at /sample, and another at /testgroup/dataset2.
+
+    In [32]: c['pandashdf5']
+    Out[32]: 
+    type: DirectoryNode
+    urlpath: /pandashdf5
+    filepath: pandashdf5
+    keys: ['data']
+    
+    In [33]: c['pandashdf5/data']
+    Out[33]: 
+    type: PandasHDFNode
+    urlpath: /pandashdf5/data
+    filepath: pandashdf5/data.hdf5
+    keys: ['sample', 'testgroup']
+    
+    In [34]: c['pandashdf5/data/sample']
+    Out[34]: 
+    type: PandasHDFNode
+    urlpath: /pandashdf5/data
+    filepath: pandashdf5/data.hdf5
+    
+    In [35]: c['pandashdf5/data/sample'].select()
+    Out[35]: 
+    <class 'pandas.core.frame.DataFrame'>
+    Int64Index: 73 entries, 0 to 72
+    Data columns (total 2 columns):
+    data      73  non-null values
+    values    73  non-null values
+    dtypes: int64(1), object(1)
+    
+    In [37]: c['pandashdf5/data/testgroup']
+    Out[37]: 
+    type: PandasHDFNode
+    urlpath: /pandashdf5/data
+    filepath: pandashdf5/data.hdf5
+    keys: ['dataset2']
+    
+    In [38]: c['pandashdf5/data/testgroup/dataset2']
+    Out[38]: 
+    type: PandasHDFNode
+    urlpath: /pandashdf5/data
+    filepath: pandashdf5/data.hdf5
+    
+    In [39]: c['pandashdf5/data/testgroup/dataset2'].select()
+    Out[39]: 
+    <class 'pandas.core.frame.DataFrame'>
+    Int64Index: 73 entries, 0 to 72
+    Data columns (total 2 columns):
+    data      73  non-null values
+    values    73  non-null values
+    dtypes: int64(1), object(1)
+
+As mentioned earlier, the array management library is a way to map python objects onto objects on disk.
+You can write your own, by extending our classes or creating your own.  At the moment, there are a few 
+relvant functions.
+
+#### For Datasets
+
+- `_get_data`, which should return a dataframe, which we then cache in hdf5
+- `load_data`, which is used for data which you can't load into memory.  
+   sql queries for example, are usually executed under load_data, and 
+   then written to hdf5 as we pull data off the cursor
+
+#### For Data groups
+
+`keys` - should return a list of children
+`get_node` - should turn urls into nodes.  This way you can define and construct your own custom node
+directly
+
+For example below, we create a custom node which reads one of the previous csv files, but multiplies a column by 2.
+
+This `load.py` is dropped into the directory where you want that key to be available.
+
+We do this to write all sorts of custom loaders - for example loaders which 
+read directories full of csv files, and then parse the filename for a date, and 
+add that as a column to the underlying data.  `load.py` files 
+are loaded using imp.load_source - a feature or bug of this
+is that that source code is read every time you try to access that directory - as a result, you can rapidly iterate on custom data ingest without having to restart the python interpreter, or call reload.
+
+    In [40]: ls example/custom
+    cache_sample2.hdf5  cache_sample.hdf5  load.py  load.pyc  sample.csv
+    
+    In [41]: cat example/custom/load.py
+    import posixpath
+    from os.path import join, relpath
+    import pandas as pd
+
+    from arraymanagement import default_loader
+    from arraymanagement.nodes.hdfnodes import PandasCacheableTable
+    
+    
+    old_keys = default_loader.keys
+    
+    old_get_node = default_loader.get_node
+    
+    class MyCSVNode(PandasCacheableTable):
+        is_group = False
+        def _get_data(self):
+            fname = join(self.basepath, self.relpath)
+            data = pd.read_csv(fname, **self.config.get('csv_options'))
+            data['values'] = data['values'] * 2
+            return data
+    
+    def get_node(urlpath, rpath, basepath, config):
+        key = posixpath.basename(urlpath)
+        if key == 'sample2':
+            fname = "sample.csv"
+            new_rpath = relpath(join(basepath, rpath, 'sample.csv'), basepath)
+            return MyCSVNode(urlpath, new_rpath, basepath, config)        
+        else:
+            return old_get_node(urlpath, rpath, basepath, config)
+    
+    def keys(urlpath, rpath, basepath, config):
+        ks = old_keys(urlpath, rpath, basepath, config)
+        ks.append('sample2')
+        return ks
+    
+    In [42]: c['custom']
+    Out[42]: 
+    type: DirectoryNode
+    urlpath: /custom
+    filepath: custom
+    keys: ['sample', 'sample2']
+    
+    In [43]: c['custom']['sample'].get()
+    Out[43]: 
+    <class 'pandas.core.frame.DataFrame'>
+    Int64Index: 73 entries, 0 to 72
+    Data columns (total 2 columns):
+    data      73  non-null values
+    values    73  non-null values
+    dtypes: int64(1), object(1)
+    
+    In [45]: c['custom']['sample'].get().head()
+    Out[45]: 
+                      data  values
+    0  2013-01-01 00:00:00       0
+    1  2013-01-02 00:00:00       1
+    2  2013-01-03 00:00:00       2
+    3  2013-01-04 00:00:00       3
+    4  2013-01-05 00:00:00       4
+    
+    In [47]: c['custom']['sample2'].select().head()
+    Out[47]: 
+                      data  values
+    0  2013-01-01 00:00:00       0
+    1  2013-01-02 00:00:00       2
+    2  2013-01-03 00:00:00       4
+    3  2013-01-04 00:00:00       6
+    4  2013-01-05 00:00:00       8
+
+
+## Long Term Features/Vision
 
 ### Data Ingest
 
@@ -33,249 +341,19 @@ Tools for working and ingesting different types of arrays.  This will be wrapped
   store with mongo style queries, built on top of sqlite.  I was considering [ejdb](http://ejdb.org/), however
   I'd rather not add non-python dependencies if we don't need them.
 - Data Ingest
-  - Some data formats require an intermediate representation (csv/json should be parsed and saved to hdf5)
-    - These will be written to a __init__.hdf5 file 
-
-  - Other formats require no intermediate representation.  We will try to do the right thing heuristically, by 
-    looking at extensions, but people can customize settings using the config
-  - load.py can be dropped into the directory - load.py, if dropped in will determine how to parse/load data for this path
-  - load.py for now, writes results into an __init__.hdf5 file, which we know how to understand
-  - config.py can specify a configuration for the directory
-  - config.py should propagate to directory children, load.py does not, unless the config asks it to.
-  - functions.py provide data access functions.  We will provide some utilities to easily build functions which will:
-    - parameterize sql queries
-    - cache the results in __init__.hdf5 files
-    - compute the parameterized results from the hdf5 cache
+    - Some data formats require an intermediate representation (csv/json should be parsed and saved to hdf5)
+    - Other formats require no intermediate representation.  We will try to do the right thing heuristically, by 
+      looking at extensions, but people can customize settings using the config
+    - load.py can be dropped into the directory - load.py, if dropped in will determine how to parse/load data for this path
+    - config.py can specify a configuration for the directory
+    - config.py should propagate to directory children, load.py does not, unless the config asks it to.
+    - functions.py provide data access functions.  We will provide some utilities to easily build functions which will:
+        - parameterize sql queries
+        - cache the results
+        - compute the parameterized results from the hdf5 cache
 - Data Slicing
   - We support basic numpy style slicing, column selections for all array types.  
   - We support more sophisticated stuff for blaze/dynd
 - Data computation
   - for pandas data, we just ship the entire dataframe (after any slicing has been done)
   - For blaze, we do expression graph stuff
-
-## Example Usage
-
-
-    In [1]: pwd
-    Out[1]: u'/home/hugoshi/work/ArrayManagement'
-    
-    In [2] from arraymanagement.client import ArrayClient
-    
-    In [3]: c = ArrayClient('example')
-    
-    In [4]: c.keys()
-    Out[4]: ['custom', 'pandashdf5', 'csvs']
-    
-    In [5]: ls example
-    config.py  config.pyc  csvs/  custom/  pandashdf5/
-    
-
-
-The contents of the example directory (3 directories, csvs, custom and pandashdf5 are mapped into 3 keys under the root directory.  The additional 
-file, config.py, is a configuration file which is used by the various data ingest routines.  This configuration is inherited and 
-can be overriden by nested directories by dropping in other config.py files.
-
-
-    In [10]: ls example/csvs
-    cache_sample2.hdf5  cache_sample.hdf5  sample2.CSV  sample.csv
-    
-    In [12]: c['csvs']
-    Out[12]: DirectoryNode:/csvs:csvs
-    
-    In [13]: c['csvs'].keys()
-    Out[13]: ['sample', 'cache_sample2', 'cache_sample', 'sample2']
-    
-    In [14]: c['csvs']['sample']
-    Out[14]: PandasCSVNode:/csvs/sample:csvs/sample.csv
-    
-    In [15]: c['csvs']['sample'].get()
-    Out[15]: 
-    <class 'pandas.core.frame.DataFrame'>
-    Int64Index: 73 entries, 0 to 72
-    Data columns (total 2 columns):
-    data      73  non-null values
-    values    73  non-null values
-    dtypes: int64(1), object(1)
-
-
-In the csvs directory we have 2 cached hdf5 files (we have classes designed to read CSVs and cache them to hdf5)
-Pandas has 2 types of hdf5 storage, a fixed format which is not queryable, you can only load the whole thing
-from disk at once, and one based on a PyTables table, which can be queried in PyTables fashion.  Supporting both
-are important, as the inability to handle vlen strings efficienlty in pytables tables can massively expand datasets in 
-memory.  The first less fexible storage mechanism is the Fixed format, versus the Table format
-
-
-    In [16]: c['csvs']['sample'].get().head()
-    Out[16]: 
-                      data  values
-    0  2013-01-01 00:00:00       0
-    1  2013-01-02 00:00:00       1
-    2  2013-01-03 00:00:00       2
-    3  2013-01-04 00:00:00       3
-    4  2013-01-05 00:00:00       4
-    
-    In [17]: import pandas as pd
-    
-    In [19]: c['csvs']['sample2'].select(where=pd.Term('values','<',3))
-    Out[19]: 
-                      data  values
-    0  2013-01-01 00:00:00       0
-    1  2013-01-02 00:00:00       1
-    2  2013-01-03 00:00:00       2
-
-
-
-We have 2 csv files in this directory, sample.csv and sample2.CSV.  The default configuration is setup to load all CSVs using the fixed format.
-however in our config.py, we overwrote to the pattern to load *.CSV in the TableFormat
-
-
-
-    In [8]: !cat example/config.py
-    from arraymanagement.nodes import csvnodes
-    loaders = {
-        '*.CSV' : csvnodes.PandasCSVTable,
-        }
-
-
-At it's core, the array management library maps nodes onto the file system.  We do this using glob filters.  The config file
-can specify glob filters of file patterns, which define which class is used to construct the node representing a resource on disk.
-Currently, there are nodes for pandas hdf5 files, csvs, sql queries, and directories.
-
-
-
-    In [21]: ls example/pandashdf5
-    data.hdf5
-    
-    In [22]: c['pandashdf5']['data']
-    Out[22]: PandasHDFNode:/pandashdf5/data:pandashdf5/data.hdf5
-    
-    In [25]:  c['pandashdf5']['data'].store
-    Out[25]: 
-    <class 'pandas.io.pytables.HDFStore'>
-    File path: /home/hugoshi/work/ArrayManagement/example/pandashdf5/data.hdf5
-    /sample                    frame_table  (typ->appendable,nrows->73,ncols->2,indexers->[index])
-    /testdir/sample            frame        (shape->[1,2])                                        
-
-
-We extend the directory - url mapping inside the hdf5 file, so pandashdf5/data/sample and 
-pandashdf5/data/testdir/sample are both valid urls.  On the file system, pandashdf5 is a directory, 
-data.hdf5 is an hdf5 file, and testdir is an hdf5 group within the dataset.  This way we have a common
-url system that can span multiple hdf5 files
-
-
-    In [26]:  c['pandashdf5']['data'].keys()
-    Out[26]: ['sample', 'testdir']
-    
-    In [27]:  c['pandashdf5']['data']['sample']
-    Out[27]: PandasHDFNode:/pandashdf5/data:pandashdf5/data.hdf5
-    
-    In [28]:  c['pandashdf5']['data']['testdir']
-    Out[28]: PandasHDFNode:/pandashdf5/data:pandashdf5/data.hdf5
-    
-    In [29]:  c['pandashdf5']['data']['testdir'].keys()
-    Out[29]: ['sample']
-    
-    In [31]:  c['pandashdf5']['data']['testdir']['sample']
-    Out[31]: PandasHDFNode:/pandashdf5/data:pandashdf5/data.hdf5
-    
-    In [32]:  c['pandashdf5']['data']['testdir']['sample'].select()
-    Out[32]: 
-    <class 'pandas.core.frame.DataFrame'>
-    Int64Index: 73 entries, 0 to 72
-    Data columns (total 2 columns):
-    data      73  non-null values
-    values    73  non-null values
-    dtypes: int64(1), object(1)
-
-
-
-As mentioned earlier, the array management library is a way to map python objects onto objects on disk.
-You can write your own, by extending our classes or creating your own.  At the moment, there are a few 
-relvant functions.
-
-For Datasets:
-
-_get_data, which should return a dataframe, which we then cache in hdf5
-load_data, which is used for data which you can't load into memory.  sql queries for example, are usually executed
-under load_data, and then written to hdf5 as we pull data off the cursor
-
-For Data groups:
-
-keys - should return a list of children
-get_node - should turn urls into nodes.  This way you can define and construct your own custom node
-directly
-
-For example below, we create a custom node which reads one of the previous csv files, but multiplies a column by 2.
-
-This load.py is dropped into the directory where you want that key to be available.
-
-We do this to write all sorts of custom loaders - for example loaders which read directories full of csv files, and then parse the filename for a date, and 
-add that as a column to the underlying data.
-
-
-    In [33]: ls custom
-    ls: cannot access custom: No such file or directory
-    
-    In [34]: ls example/custom
-    cache_sample2.hdf5  cache_sample.hdf5  load.py  load.pyc  sample.csv
-    
-    In [35]: cat example/custom/load.py
-    import posixpath
-    from os.path import join, relpath
-    import pandas as pd
-    
-    from arraymanagement import default_loader
-    from arraymanagement.nodes.hdfnodes import PandasCacheableTable
-    
-    
-    keys = default_loader.keys
-    
-    old_get_node = default_loader.get_node
-    
-    class MyCSVNode(PandasCacheableTable):
-        is_group = False
-        def _get_data(self):
-            fname = join(self.basepath, self.relpath)
-            data = pd.read_csv(fname, **self.config.get('csv_options'))
-            data['values'] = data['values'] * 2
-            return data
-    
-    def get_node(urlpath, rpath, basepath, config):
-        key = posixpath.basename(urlpath)
-        if key == 'sample2':
-            fname = "sample.csv"
-            new_rpath = relpath(join(basepath, rpath, 'sample.csv'), basepath)
-            return MyCSVNode(urlpath, new_rpath, basepath, config)        
-        else:
-            return old_get_node(urlpath, rpath, basepath, config)
-    
-    In [37]: c['custom']['sample2']
-    Out[37]: MyCSVNode:/custom/sample2:custom/sample.csv
-    
-    In [38]: c['custom']['sample2'].select()
-    Out[38]: 
-    <class 'pandas.core.frame.DataFrame'>
-    Int64Index: 73 entries, 0 to 72
-    Data columns (total 2 columns):
-    data      73  non-null values
-    values    73  non-null values
-    dtypes: int64(1), object(1)
-    
-    In [39]: c['custom']['sample2'].select().head(0
-       ....: )
-    Out[39]: 
-    Empty DataFrame
-    Columns: [data, values]
-    Index: []
-    
-    In [40]: c['custom']['sample2'].select().head()
-    Out[40]: 
-                      data  values
-    0  2013-01-01 00:00:00       0
-    1  2013-01-02 00:00:00       2
-    2  2013-01-03 00:00:00       4
-    3  2013-01-04 00:00:00       6
-    4  2013-01-05 00:00:00       8
-    
-    In [41]: 
-

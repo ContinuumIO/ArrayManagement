@@ -6,7 +6,7 @@ from arraymanagement import default_loader
 from arraymanagement.nodes.hdfnodes import PandasCacheableTable
 
 
-keys = default_loader.keys
+old_keys = default_loader.keys
 
 old_get_node = default_loader.get_node
 
@@ -26,3 +26,8 @@ def get_node(urlpath, rpath, basepath, config):
         return MyCSVNode(urlpath, new_rpath, basepath, config)        
     else:
         return old_get_node(urlpath, rpath, basepath, config)
+
+def keys(urlpath, rpath, basepath, config):
+    ks = old_keys(urlpath, rpath, basepath, config)
+    ks.append('sample2')
+    return ks
