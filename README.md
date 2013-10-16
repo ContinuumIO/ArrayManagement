@@ -58,7 +58,8 @@ hdf5 cache files, and other distractions like pyc files removed from the list)
 
 
 To begin, we construct a Client.
-
+    
+    In [14]: from arraymanagement.client import ArrayClient
     In [15]: c = ArrayClient('example')
     
     In [16]: c
