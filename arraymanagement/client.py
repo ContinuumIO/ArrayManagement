@@ -4,7 +4,7 @@ from os.path import join, dirname, isdir, relpath, exists, abspath
 from config import NodeConfig
 import pathutils
 from nodes.dirnodes import DirectoryNode
-from nodes import Node
+from nodes import Node, NodeContext
 import default_loader
 import sys
 
@@ -16,7 +16,8 @@ class ArrayClient(Node):
         self.config = NodeConfig.from_paths(self.root, self.root, self)
         if self.root not in sys.path:
             sys.path.append(self.root)
-        super(ArrayClient, self).__init__("/", ".", self.root, self.config)
+        context = NodeContext("/", ".", self.root, self.config)
+        super(ArrayClient, self).__init__(context)
 
     def get_node(self, urlpath):
         if not urlpath.startswith("/"):
@@ -24,7 +25,7 @@ class ArrayClient(Node):
         names = pathutils.urlsplit(urlpath, "/")
         basepath = self.root
         rpath = relpath(basepath, basepath)
-        basenode = DirectoryNode("/", rpath, basepath, self.config, mod=default_loader)
+        basenode = DirectoryNode(self.context, mod=default_loader)
         node = basenode
         for n in names:
             node = node.get_node(n)

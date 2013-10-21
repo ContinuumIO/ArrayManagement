@@ -24,9 +24,9 @@ def test_hdf_node():
 def test_custom_node():
     basepath = join(dirname(dirname(__file__)), 'example')
     client = ArrayClient(basepath)
-    node = client.get_node('/custom/custom/sample2')
+    node = client.get_node('/custom/sample2')
     data1 = node.select()
-    node = client.get_node('/custom/custom/sample')
+    node = client.get_node('/custom/sample')
     data2 = node.get()
     assert data2.iloc[2]['values'] == 2
     assert data1.iloc[2]['values'] == 4

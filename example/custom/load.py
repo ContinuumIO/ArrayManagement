@@ -4,7 +4,7 @@ import pandas as pd
 
 from arraymanagement import default_loader
 from arraymanagement.nodes.hdfnodes import PandasCacheableTable
-
+from arraymanagement.nodes import NodeContext
 
 old_keys = default_loader.keys
 
@@ -18,16 +18,17 @@ class MyCSVNode(PandasCacheableTable):
         data['values'] = data['values'] * 2
         return data
 
-def get_node(urlpath, rpath, basepath, config):
-    key = posixpath.basename(urlpath)
+def get_node(key, context, overrides={}):
     if key == 'sample2':
         fname = "sample.csv"
-        new_rpath = relpath(join(basepath, rpath, 'sample.csv'), basepath)
-        return MyCSVNode(urlpath, new_rpath, basepath, config)        
+        new_rpath = context.rpath(context.joinpath('sample.csv'))
+        urlpath = context.joinurl(key)
+        newcontext = context.clone(relpath=new_rpath, urlpath=urlpath)
+        return MyCSVNode(newcontext)
     else:
-        return old_get_node(urlpath, rpath, basepath, config)
+        return old_get_node(key, context)
 
-def keys(urlpath, rpath, basepath, config):
-    ks = old_keys(urlpath, rpath, basepath, config)
+def keys(context, overrides={}):
+    ks = old_keys(context)
     ks.append('sample2')
     return ks

@@ -1,6 +1,6 @@
 from os.path import basename, splitext, join, exists
 import posixpath
-from . import Node
+from . import Node, NodeContext
 from .. import pathutils
 
 import imp
@@ -9,24 +9,33 @@ logger = logging.getLogger(__name__)
 
 class DirectoryNode(Node):
     is_group = True
-    def __init__(self, urlpath, relpath, basepath, config, mod=None):
-        super(DirectoryNode, self).__init__(urlpath, relpath, basepath, config)
-        loadpath = join(basepath, relpath, "load.py")
+    def __init__(self, context, mod=None):
+        super(DirectoryNode, self).__init__(context)
+        loadpath = self.joinpath("load.py")
         if exists(loadpath):
-            directories = pathutils.dirsplit(relpath, basepath)
+            directories = pathutils.dirsplit(self.relpath, self.basepath)
             name = "_".join(directories)
             name += "_load"
             self.mod = imp.load_source(name, loadpath)
         else:
             self.mod = mod
+    
+    def overrides(self):
+        if hasattr(self.mod, 'overrides'):
+            return self.mod.overrides
+        else:
+            return {}
 
     def keys(self):
-        return self.mod.keys(self.urlpath, self.relpath, self.basepath, self.config)
+        overrides = {}
+        return self.mod.keys(context, overrides=overrides)
     
     def get_node(self, key):
-        urlpath = posixpath.join(self.urlpath, key)
+        overrides = {}
+        urlpath = self.joinurl(key)
         logger.debug("retrieving url %s", urlpath)
-        return self.mod.get_node(urlpath, self.relpath, self.basepath, self.config)
+        return self.mod.get_node(key, self.context, overrides=overrides)
+
 
     
         

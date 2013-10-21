@@ -8,8 +8,8 @@ import fnmatch
 from nodes import dirnodes
 import sys
 
-def keys(urlpath, rpath, basepath, config):
-    fnames = os.listdir(join(basepath, rpath))
+def keys(context, overrides={}):
+    fnames = os.listdir(context.absolute_file_path)
     fnames = [x for x in fnames if not (x.startswith('cache') and x.endswith('hdf5'))]
     ks = []
     loaders = config.get('loaders')
@@ -21,34 +21,47 @@ def keys(urlpath, rpath, basepath, config):
     for fname in fnames:
         if isdir(join(basepath, rpath, fname)):
             names.add(fname)
-    return list(names)
+    names.update(overrides.keys())
+    return list(names) 
 
-def get_node(urlpath, rpath, basepath, config):
+
+def dispatch(loader, context):
+    if isinstance(loader, (tuple, list)):
+        return loader[0](context, **loader[1])
+    else:
+        return loader(context)
+
+def get_node(key, context, overrides={}):
     """
     urlpath : to the resource you are seeking
     rpath : path to this directory
     basepath : basepath of directory tree
     """
-    abspath = join(basepath, rpath)
-    key = posixpath.basename(urlpath)
+    urlpath = context.joinurl(key)
+    abspath = context.absolute_file_path
+    if key in overrides:
+        return dispatch(overrides[key], context.clone(urlpath=urlpath))
     files = os.listdir(abspath)
-    files = [x for x in files if splitext(x)[0] == key]
-    if len (files) > 1:
-        raise ArrayManagementException, 'multile files matching %s: %s' % (key, str(files))
-    fname = files[0]
-    new_abspath = join(abspath, fname)
-    new_rpath = relpath(new_abspath, basepath)
+    if key in files:
+        fname = key
+    else:
+        files = [x for x in files if splitext(x)[0] == key]
+        if len (files) > 1:
+            raise ArrayManagementException, 'multile files matching %s: %s' % (key, str(files))
+        fname = files[0]
+    new_abspath = context.joinpath(fname)
+    new_rpath = context.rpath(new_abspath)
     if isdir(new_abspath):
-        new_config = config.clone_and_update(new_rpath)
-        return dirnodes.DirectoryNode(urlpath, new_rpath, basepath, new_config, 
-                                      mod=sys.modules[__name__])
-    prefix, extension = splitext(new_abspath)
-    loaders = config.get('loaders')
-    pattern_priority = config.get('pattern_priority')
+        new_config = context.config.clone_and_update(new_rpath)
+        newcontext = context.clone(relpath=new_rpath, config=new_config, urlpath=urlpath)
+        return dirnodes.DirectoryNode(newcontext, mod=sys.modules[__name__])
+    newcontext = context.clone(relpath=new_rpath, ulrpath=urlpath)
+    loaders = context.config.get('loaders')
+    pattern_priority = context.config.get('pattern_priority')
     for pattern in pattern_priority and loaders:
         if fnmatch.fnmatch(fname, pattern):
-            return loaders[pattern](urlpath, new_rpath, basepath, config)
+            return dispatch(loaders[pattern], newcontext)
     for pattern in loaders:
         if fnmatch.fnmatch(fname, pattern):
-            return loaders[pattern](urlpath, new_rpath, basepath, config)
+            return dispatch(loaders[pattern], newcontext)
     return None

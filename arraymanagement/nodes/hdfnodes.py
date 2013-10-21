@@ -121,14 +121,12 @@ def write_pandas(store, localpath, df, min_itemsize,
                      chunksize=chunksize, data_columns=True)
 
 class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
-    def __init__(self, urlpath, relpath, basepath, config, localpath="/"):
-        super(PandasHDFNode, self).__init__(urlpath, relpath, basepath, config)
+    def __init__(self, context, localpath="/"):
+        super(PandasHDFNode, self).__init__(context)
         self.localpath = localpath
-        self.store = get_pandas_hdf5(join(basepath, relpath))
-
+        self.store = get_pandas_hdf5(self.absolute_file_path)
         # this will either point to a hdf group, or an hdf table... maybe this is bad idea
         # to do this all in one class but for now...
-
         if self.store.keys() == ['__data__']:
             self.localpath = "/__data__"
             self.is_group = False
@@ -148,15 +146,14 @@ class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
     def get_node(self, key):
         if not self.is_group:
             return ArrayManagementException, 'This node is not a group'
-        new_local_path = join(self.localpath, key)
-        return PandasHDFNode(self.urlpath, self.relpath, self.basepath, self.config,
-                             localpath=new_local_path)
+        new_local_path = posixpath.join(self.localpath, key)
+        return PandasHDFNode(self.context, localpath=new_local_path)
 
 class PandasCacheable(Node):
-    def __init__(self, urlpath, relpath, basepath, config):
-        super(PandasCacheable, self).__init__(urlpath, relpath, basepath, config)
+    def __init__(self, context):
+        super(PandasCacheable, self).__init__(context)
         self.store = None
-        self.localpath = "/" + posixpath.basename(urlpath)
+        self.localpath = "/" + posixpath.basename(context.urlpath)
     def _get_store(self):
         if not self.store:
             cache_name = "cache_%s.hdf5" % posixpath.basename(self.urlpath)
@@ -188,6 +185,8 @@ class PandasCacheableTable(PandasCacheable):
         return self.store.select(self.localpath, *args, **kwargs)
 
 class PandasCacheableFixed(PandasCacheable):
+    """extend this class to define custom pandas nodes
+    """
     inmemory_cache = {}
     def load_data(self, force=False):
         store = self._get_store()
@@ -206,8 +205,3 @@ class PandasCacheableFixed(PandasCacheable):
     def get(self, *args, **kwargs):
         self.load_data(force=kwargs.pop('force', None))
         return self.inmemory_cache[self.localpath]
-
-        
-    
-    
-
