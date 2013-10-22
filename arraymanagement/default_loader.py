@@ -54,7 +54,7 @@ def get_node(key, context, overrides={}):
     if isdir(new_abspath):
         new_config = context.config.clone_and_update(new_rpath)
         newcontext = context.clone(relpath=new_rpath, config=new_config, urlpath=urlpath)
-        return dirnodes.DirectoryNode(newcontext, mod=sys.modules[__name__])
+        return dirnodes.DirectoryNode(newcontext, default_mod=sys.modules[__name__])
     newcontext = context.clone(relpath=new_rpath, ulrpath=urlpath)
     loaders = context.config.get('loaders')
     pattern_priority = context.config.get('pattern_priority')
