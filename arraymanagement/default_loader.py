@@ -12,14 +12,14 @@ def keys(context, overrides={}):
     fnames = os.listdir(context.absolute_file_path)
     fnames = [x for x in fnames if not (x.startswith('cache') and x.endswith('hdf5'))]
     ks = []
-    loaders = config.get('loaders')
+    loaders = context.config.get('loaders')
     names = set()
     for pattern in loaders:
         matches = fnmatch.filter(fnames, pattern)
         matches = [splitext(match)[0] for match in matches]
         names.update(matches)
     for fname in fnames:
-        if isdir(join(basepath, rpath, fname)):
+        if isdir(context.joinpath(fname)):
             names.add(fname)
     names.update(overrides.keys())
     return list(names) 

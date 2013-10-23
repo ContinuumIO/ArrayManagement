@@ -55,7 +55,6 @@ class Node(object):
         return self.get_node(k)
     
     def __repr__(self):
-        import pdb;pdb.set_trace()
         info = ["type: %s" % self.__class__.__name__,
                 "urlpath: %s" % self.urlpath,
                 "filepath: %s" % self.relpath]
@@ -73,4 +72,5 @@ class Node(object):
     def joinpath(self, path):
         return self.context.joinpath(path)
 
-
+    def rpath(self, path):
+        return self.context.rpath(path)

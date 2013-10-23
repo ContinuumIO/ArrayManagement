@@ -28,14 +28,14 @@ class DirectoryNode(Node):
             return {}
 
     def keys(self):
-        overrides = {}
+        overrides = self.overrides()
         if hasattr(self.mod, 'keys'):
             return self.mod.keys(self.context, overrides=overrides)
         else:
             return self.default_mod.keys(self.context, overrides=overrides)
     
     def get_node(self, key):
-        overrides = {}
+        overrides = self.overrides()
         urlpath = self.joinurl(key)
         logger.debug("retrieving url %s", urlpath)
         if hasattr(self.mod, 'get_node'):

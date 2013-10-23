@@ -12,7 +12,7 @@ old_get_node = default_loader.get_node
 
 class MyCSVNode(PandasCacheableTable):
     is_group = False
-    def _get_data(self):
+    def get_data(self):
         fname = join(self.basepath, self.relpath)
         data = pd.read_csv(fname, **self.config.get('csv_options'))
         data['values'] = data['values'] * 2

@@ -148,16 +148,20 @@ class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
             return ArrayManagementException, 'This node is not a group'
         new_local_path = posixpath.join(self.localpath, key)
         return PandasHDFNode(self.context, localpath=new_local_path)
+import types
 
 class PandasCacheable(Node):
-    def __init__(self, context):
+    def __init__(self, context, get_data=None):
         super(PandasCacheable, self).__init__(context)
         self.store = None
         self.localpath = "/" + posixpath.basename(context.urlpath)
+        if get_data:
+            self.get_data = types.MethodType(get_data, self)
+
     def _get_store(self):
         if not self.store:
-            cache_name = "cache_%s.hdf5" % posixpath.basename(self.urlpath)
-            apath = join(self.basepath, self.relpath)
+            cache_name = "cache_%s.hdf5" % self.key
+            apath = self.absolute_file_path
             if isfile(apath):
                 cache_path = join(dirname(apath), cache_name)
             else:
@@ -172,7 +176,7 @@ class PandasCacheableTable(PandasCacheable):
         store = self._get_store()
         if not force and self.localpath in store.keys():
             return
-        data = self._get_data()
+        data = self.get_data()
         logger.debug("GOT DATA with shape %s for %s, writing to pytables", data.shape, self.urlpath)
         write_pandas(self.store, self.localpath, data, 
                      self.min_itemsize, 
@@ -180,6 +184,8 @@ class PandasCacheableTable(PandasCacheable):
                      chunksize=500000, 
                      replace=True)
         self.store.flush()
+        return self
+
     def select(self, *args, **kwargs):
         self.load_data(force=kwargs.pop('force', None))
         return self.store.select(self.localpath, *args, **kwargs)
@@ -195,12 +201,12 @@ class PandasCacheableFixed(PandasCacheable):
         if not force and self.localpath in store:
             self.inmemory_cache[self.localpath] = self.store.get(self.localpath)
             return
-        data = self._get_data()
+        data = self.get_data()
         logger.debug("GOT DATA with shape %s, writing to pytables", data.shape)
         self.store.put(self.localpath, data)
         self.inmemory_cache[self.localpath] = data
         self.store.flush()
-        return data
+        return self
 
     def get(self, *args, **kwargs):
         self.load_data(force=kwargs.pop('force', None))

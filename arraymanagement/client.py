@@ -25,7 +25,7 @@ class ArrayClient(Node):
         names = pathutils.urlsplit(urlpath, "/")
         basepath = self.root
         rpath = relpath(basepath, basepath)
-        basenode = DirectoryNode(self.context, mod=default_loader)
+        basenode = DirectoryNode(self.context, default_mod=default_loader)
         node = basenode
         for n in names:
             node = node.get_node(n)

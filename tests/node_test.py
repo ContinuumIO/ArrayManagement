@@ -30,3 +30,35 @@ def test_custom_node():
     data2 = node.get()
     assert data2.iloc[2]['values'] == 2
     assert data1.iloc[2]['values'] == 4
+
+def test_custom_override_node():
+    basepath = join(dirname(dirname(__file__)), 'example')
+    client = ArrayClient(basepath)
+    node = client.get_node('/custom2/sample2')
+    data1 = node.select()
+    node = client.get_node('/custom2/sample')
+    data2 = node.get()
+    assert data2.iloc[2]['values'] == 2
+    assert data1.iloc[2]['values'] == 12
+
+def test_csv_parsing_options():
+    basepath = join(dirname(dirname(__file__)), 'example')
+    client = ArrayClient(basepath)
+    node = client.get_node('/custom2/sample2')
+    data1 = node.select()
+    node = client.get_node('/custom2/sample')
+    data2 = node.get()
+    assert data2.iloc[2]['values'] == 2
+    assert data1.iloc[2]['values'] == 12
+
+
+def test_csv_node():
+    basepath = join(dirname(dirname(__file__)), 'example')
+    client = ArrayClient(basepath)
+    node = client.get_node('/customcsvs/sample')
+    data1 = node.get()
+    node = client.get_node('/customcsvs/sample2')
+    data2 = node.select()
+    node = client.get_node('/customcsvs/sample_pipe')
+    data3 = node.select()
+    #better check later
