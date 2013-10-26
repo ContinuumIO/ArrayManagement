@@ -43,19 +43,26 @@ you stick arbitrary python objects into the url hierarchy.  One common use case 
 We'll start with the examples directory - here is the filesystem hierarchy of the example directory (with my
 hdf5 cache files, and other distractions like pyc files removed from the list)
 
-
-    In [19]: !find example
+    In [1]: !find example
     example
+    example/custom
+    example/custom/sample.csv
+    example/custom/custom
+    example/custom/load.py
+    example/custom2
+    example/custom2/sample.csv
+    example/custom2/load.py
+    example/csvs
+    example/csvs/sample.csv
+    example/csvs/sample2.CSV
+    example/customcsvs
+    example/customcsvs/sample.csv
+    example/customcsvs/sample2.CSV
+    example/customcsvs/config.py
+    example/customcsvs/sample_pipe.csv
     example/pandashdf5
     example/pandashdf5/data.hdf5
     example/config.py
-    example/csvs
-    example/csvs/sample2.CSV
-    example/csvs/sample.csv
-    example/custom
-    example/custom/load.py
-    example/custom/sample.csv
-
 
 To begin, we construct a Client.
     
@@ -216,23 +223,27 @@ pandashdf5 directory, we have a data.hdf5 which has 2 datasets, one at /sample, 
 
 As mentioned earlier, the array management library is a way to map python objects onto objects on disk.
 You can write your own, by extending our classes or creating your own.  At the moment, there are a few 
-relvant functions.
+relevant functions, and parameters that can be used to customize this behavior.
 
 #### For Datasets
 
-- `_get_data`, which should return a dataframe, which we then cache in hdf5
+- `get_data`, which should return a dataframe, which we then cache in hdf5
 - `load_data`, which is used for data which you can't load into memory.  
    sql queries for example, are usually executed under load_data, and 
    then written to hdf5 as we pull data off the cursor
 
-#### For Data groups
+#### For Data groups - Basic
+`overrides` - This is a dictionary of keys to parameters.  If a key is in the dictionary, a node corresponding to the specified parameters
+  is constructed
+`loaders` - This is a dictionary of glob patterns to parameters.  If a file matches the glob pattern, a node is constructed according to the specified parameters
+`pattern_priority` - This is a list of glob patterns - you can use this in case a file matches multiple glob patterns
 
+#### For Data groups - Advanced
 `keys` - should return a list of children
 `get_node` - should turn urls into nodes.  This way you can define and construct your own custom node
 directly
 
-For example below, we create a custom node which reads one of the previous csv files, but multiplies a column by 2.
-
+For example below, we create a create a custom key, which returns a specific CSV, with one of the columns transformed (multiplied by 6)
 This `load.py` is dropped into the directory where you want that key to be available.
 
 We do this to write all sorts of custom loaders - for example loaders which 
@@ -241,77 +252,47 @@ add that as a column to the underlying data.  `load.py` files
 are loaded using imp.load_source - a feature or bug of this
 is that that source code is read every time you try to access that directory - as a result, you can rapidly iterate on custom data ingest without having to restart the python interpreter, or call reload.
 
-    In [40]: ls example/custom
-    cache_sample2.hdf5  cache_sample.hdf5  load.py  load.pyc  sample.csv
-    
-    In [41]: cat example/custom/load.py
+One other wierd thing we do, which turns out to be quite useful - you'll notice that `get_factor_data` is written as an instance method.  It actually gets patched in
+as the get_data method of that particular instance representing that dataset.
+
+    In [14]: ls example/custom2
+    load.py  sample.csv
+
+    In [15]: cat example/custom2/load.py 
     import posixpath
     from os.path import join, relpath
     import pandas as pd
 
     from arraymanagement import default_loader
     from arraymanagement.nodes.hdfnodes import PandasCacheableTable
+    from arraymanagement.nodes import NodeContext
+
+    def get_factor_data(self):
+        path = self.joinpath('sample.csv')
+        data = pd.read_csv(path)
+        data['values'] = data['values'] * 6
+        return data
+
+    overrides = {'sample2' : (PandasCacheableTable, {'get_data' : get_factor_data})}
     
-    
-    old_keys = default_loader.keys
-    
-    old_get_node = default_loader.get_node
-    
-    class MyCSVNode(PandasCacheableTable):
-        is_group = False
-        def _get_data(self):
-            fname = join(self.basepath, self.relpath)
-            data = pd.read_csv(fname, **self.config.get('csv_options'))
-            data['values'] = data['values'] * 2
-            return data
-    
-    def get_node(urlpath, rpath, basepath, config):
-        key = posixpath.basename(urlpath)
-        if key == 'sample2':
-            fname = "sample.csv"
-            new_rpath = relpath(join(basepath, rpath, 'sample.csv'), basepath)
-            return MyCSVNode(urlpath, new_rpath, basepath, config)        
-        else:
-            return old_get_node(urlpath, rpath, basepath, config)
-    
-    def keys(urlpath, rpath, basepath, config):
-        ks = old_keys(urlpath, rpath, basepath, config)
-        ks.append('sample2')
-        return ks
-    
-    In [42]: c['custom']
-    Out[42]: 
-    type: DirectoryNode
-    urlpath: /custom
-    filepath: custom
-    keys: ['sample', 'sample2']
-    
-    In [43]: c['custom']['sample'].get()
-    Out[43]: 
-    <class 'pandas.core.frame.DataFrame'>
-    Int64Index: 73 entries, 0 to 72
-    Data columns (total 2 columns):
-    data      73  non-null values
-    values    73  non-null values
-    dtypes: int64(1), object(1)
-    
-    In [45]: c['custom']['sample'].get().head()
-    Out[45]: 
+
+    In [18]: c['custom2']['sample'].get().head()
+    Out[18]: 
                       data  values
     0  2013-01-01 00:00:00       0
     1  2013-01-02 00:00:00       1
     2  2013-01-03 00:00:00       2
     3  2013-01-04 00:00:00       3
     4  2013-01-05 00:00:00       4
-    
-    In [47]: c['custom']['sample2'].select().head()
-    Out[47]: 
+
+    In [20]: c['custom2']['sample2'].select().head()
+    Out[20]: 
                       data  values
     0  2013-01-01 00:00:00       0
-    1  2013-01-02 00:00:00       2
-    2  2013-01-03 00:00:00       4
-    3  2013-01-04 00:00:00       6
-    4  2013-01-05 00:00:00       8
+    1  2013-01-02 00:00:00       6
+    2  2013-01-03 00:00:00      12
+    3  2013-01-04 00:00:00      18
+    4  2013-01-05 00:00:00      24
 
 
 ## Long Term Features/Vision
