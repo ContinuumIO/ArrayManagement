@@ -19,11 +19,19 @@ file, which can be dropped anywhere inside the hierarchy.  This directories and 
 of parent directories.  You can drop more config.py files to get more specific behavior deeper in the file system
 hierarchy
 
+- Simple customizations can be added by adding adding an `overrides` dictionary into the load.py file.  This will map
+keys to parameters used to construct nodes (a tuple of class, kwargs for the class constructor).
+
+- Simple customizations can also be added by adding globs into the `loaders` dictionary in the config.py file.  
+This will map files matching the glob pattern, to parameters used to construct nodes - again, a tuple of the class, 
+and kwargs for the class constructor)
+
 - Advanced customizations can be added by dropping in a `load.py` file.  The `load.py` file defines 2 functions, 
 `keys` (think ls, or dir, or keys of a dictionary), and `get_node`.  
 `get_node` returns some python object for the 
 resource on the file system.  By modifying `keys`, and `get_node`,
-you stick arbitrary python objects into the url hierarchy.  One common use case of this is to return datasets that are derivatives of other datasets (think concatenating a bunch of csv files together).  
+you stick arbitrary python objects into the url hierarchy.  
+One common use case of this is to return datasets that are derivatives of other datasets (think concatenating a bunch of csv files together).  
 
 - There are a few utility objects right now - which probably need better names
     - PandasCacheableFixed - an object that can return a dataframe.  This is then cached in hdf5 using pandas
