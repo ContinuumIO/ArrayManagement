@@ -26,12 +26,9 @@ keys to parameters used to construct nodes (a tuple of class, kwargs for the cla
 This will map files matching the glob pattern, to parameters used to construct nodes - again, a tuple of the class, 
 and kwargs for the class constructor)
 
-- Advanced customizations can be added by dropping in a `load.py` file.  The `load.py` file defines 2 functions, 
-`keys` (think ls, or dir, or keys of a dictionary), and `get_node`.  
-`get_node` returns some python object for the 
-resource on the file system.  By modifying `keys`, and `get_node`,
-you stick arbitrary python objects into the url hierarchy.  
-One common use case of this is to return datasets that are derivatives of other datasets (think concatenating a bunch of csv files together).  
+- Advanced customizations can be added by dropping in a `load.py` file. The `load.py` file defines 2 functions, 
+`keys` (think ls, or dir, or keys of a dictionary), and `get_node`. `get_node` returns some python object for the 
+resource on the file system.  By modifying `keys`, and `get_node`, you stick arbitrary python objects into the url hierarchy.  One common use case of this is to return datasets that are derivatives of other datasets (think concatenating a bunch of csv files together).  
 
 - There are a few utility objects right now - which probably need better names
     - PandasCacheableFixed - an object that can return a dataframe.  This is then cached in hdf5 using pandas
@@ -89,8 +86,8 @@ To begin, we construct a Client.
 
 
 The contents of the example directory 
-(3 directories, csvs, custom and pandashdf5 are mapped into 3 keys under the root directory.  
-The additional file, config.py, is a configuration file which is used by the various data ingest routines.  
+(3 directories, csvs, custom and pandashdf5 are mapped into 3 keys under the root directory.
+The additional file, config.py, is a configuration file which is used by the various data ingest routines.
 This configuration is inherited and can be overriden by nested directories by dropping in other config.py files.
 We will begin by looking into the csvs directory.
 
@@ -152,8 +149,8 @@ This is the config file that induces this behavior
         '*.CSV' : csvnodes.PandasCSVTable,
         }
 
-At it's core, the array management library maps python objects/nodes onto the file system.  
-We do this using glob filters.  The config file specifies glob filters of file patterns, 
+At it's core, the array management library maps python objects/nodes onto the file system.
+We do this using glob filters.  The config file specifies glob filters of file patterns,
 which define which class is used to construct the python object representing a resource on disk.
 Currently, there are nodes for pandas hdf5 files, csvs, sql queries, and directories.
 Next lets look inside the pandashdf5 directory
@@ -267,13 +264,9 @@ as the get_data method of that particular instance representing that dataset.
     load.py  sample.csv
 
     In [15]: cat example/custom2/load.py 
-    import posixpath
-    from os.path import join, relpath
+    
     import pandas as pd
-
-    from arraymanagement import default_loader
     from arraymanagement.nodes.hdfnodes import PandasCacheableTable
-    from arraymanagement.nodes import NodeContext
 
     def get_factor_data(self):
         path = self.joinpath('sample.csv')
