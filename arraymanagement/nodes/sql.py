@@ -21,7 +21,9 @@ class SimpleQueryTable(PandasCacheableTable):
         else:
             with open(join(self.basepath, self.relpath)) as f:
                 self.query = f.read()
-    def execute_query(self):
+    def execute_query(self, query=None):
+        if query is None:
+            query = self.query
         mod = self.config.get('db_module')
         with mod.connect(*self.config.get('db_conn_args')) as db:
             cur = db.cursor()
@@ -62,11 +64,13 @@ class SimpleQueryTable(PandasCacheableTable):
         datetime_type = self.config.get('datetime_type')
         dt_overrides = overrides.setdefault(datetime_type, [])
         dt_overrides += dt_fields
-        write_pandas_hdf_from_cursor(self.store, self.localpath, cur, columns, self.min_itemsize, 
+        write_pandas_hdf_from_cursor(self.store, self.localpath, cur, 
+                                     columns, self.min_itemsize, 
                                      dtype_overrides=overrides,
                                      min_item_padding=self.min_item_padding,
                                      chunksize=50000, 
                                      replace=True)
+        cur.close()
         self.store.flush()
 
 class SimpleParameterizedQueryTable(SimpleQueryTable):
