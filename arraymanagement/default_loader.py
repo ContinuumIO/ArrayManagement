@@ -11,6 +11,7 @@ import sys
 def keys(context, overrides={}):
     fnames = os.listdir(context.absolute_file_path)
     fnames = [x for x in fnames if not (x.startswith('cache') and x.endswith('hdf5'))]
+    fnames = [x for x in fnames if not x.startswith('.')]
     ks = []
     loaders = context.config.get('loaders')
     names = set()
@@ -55,7 +56,7 @@ def get_node(key, context, overrides={}):
         new_config = context.config.clone_and_update(new_rpath)
         newcontext = context.clone(relpath=new_rpath, config=new_config, urlpath=urlpath)
         return dirnodes.DirectoryNode(newcontext, default_mod=sys.modules[__name__])
-    newcontext = context.clone(relpath=new_rpath, ulrpath=urlpath)
+    newcontext = context.clone(relpath=new_rpath, urlpath=urlpath)
     loaders = context.config.get('loaders')
     pattern_priority = context.config.get('pattern_priority')
     for pattern in pattern_priority and loaders:
