@@ -1,6 +1,6 @@
 import os
 import copy
-from os.path import basename, splitext, join, isfile, isdir, dirname
+from os.path import basename, splitext, join, isfile, isdir, dirname, exists
 import posixpath
 import math
 
@@ -76,6 +76,7 @@ def write_pandas_hdf_from_cursor(store, localpath, cursor, columns, min_itemsize
             logger.debug("writing rowend %s", global_count)
             store.append(localpath, df, min_itemsize=min_itemsize, 
                          chunksize=chunksize, data_columns=True)
+            store.flush()
     while True:
         d = cursor.fetchmany(cursor.arraysize)
         count += len(d)
@@ -151,6 +152,18 @@ class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
 import types
 
 class PandasCacheable(Node):
+    def cache_path(self):
+        cache_name = "cache_%s.hdf5" % self.key
+        apath = self.absolute_file_path
+        if isfile(apath):
+            cachedir = join(dirname(apath), '.cache')
+        else:
+            cachedir = join(apath, '.cache')
+        if not exists(cachedir):
+            os.makedirs(cachedir)
+        cache_path = join(cachedir, cache_name)
+        return cache_path
+
     def __init__(self, context, get_data=None):
         super(PandasCacheable, self).__init__(context)
         self.store = None
@@ -160,12 +173,7 @@ class PandasCacheable(Node):
 
     def _get_store(self):
         if not self.store:
-            cache_name = "cache_%s.hdf5" % self.key
-            apath = self.absolute_file_path
-            if isfile(apath):
-                cache_path = join(dirname(apath), cache_name)
-            else:
-                cache_path = join(apath, cache_name)
+            cache_path = self.cache_path()
             self.store = get_pandas_hdf5(cache_path)
         return self.store
         
