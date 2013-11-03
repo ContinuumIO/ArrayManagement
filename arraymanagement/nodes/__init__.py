@@ -40,7 +40,7 @@ class NodeContext(object):
         return self.__class__(args['urlpath'], args['relpath'], 
                               args['basepath'], args['config'])
         
-    
+display_limit=100
 class Node(object):
     def __init__(self, context):
         self.urlpath = context.urlpath
@@ -59,7 +59,11 @@ class Node(object):
                 "urlpath: %s" % self.urlpath,
                 "filepath: %s" % self.relpath]
         if hasattr(self, 'keys') and self.is_group:
-            info.append('keys: %s' % str(self.keys()))
+            keys = self.keys()
+            if len(keys) >= display_limit:
+                info.append('%s keys: %s ...' % (len(keys), ",".join(keys[:display_limit])))
+            else:
+                info.append('%s keys: %s ' % (len(keys), ",".join(keys)))
         return "\n".join(info)
 
     @property

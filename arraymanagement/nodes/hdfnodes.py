@@ -149,6 +149,24 @@ class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
             return ArrayManagementException, 'This node is not a group'
         new_local_path = posixpath.join(self.localpath, key)
         return PandasHDFNode(self.context, localpath=new_local_path)
+
+    def put(self, key, value, format='fixed', append=False):
+        new_local_path = posixpath.join(self.localpath, key)
+        if append:
+            format = 'table'
+            replace = False
+        else:
+            replace = True
+        if format == 'table':
+            write_pandas(self.store, new_localpath_path, value, 
+                         self.min_itemsize, 
+                         min_item_padding=self.min_item_padding,
+                         chunksize=500000, 
+                         replace=replace)
+        else:
+            self.store.put(new_local_path, value)
+        self.store.flush()
+
 import types
 
 class PandasCacheable(Node):
