@@ -225,15 +225,16 @@ class PandasCacheableFixed(PandasCacheable):
         if not force and self.localpath in self.inmemory_cache:
             return
         if not force and self.localpath in store:
-            self.inmemory_cache[self.localpath] = self.store.get(self.localpath)
+            self.inmemory_cache[self.absolute_file_path, self.localpath] = self.store.get(
+                self.localpath)
             return
         data = self.get_data()
         logger.debug("GOT DATA with shape %s, writing to pytables", data.shape)
         self.store.put(self.localpath, data)
-        self.inmemory_cache[self.localpath] = data
+        self.inmemory_cache[self.absolute_file_path, self.localpath] = data
         self.store.flush()
         return self
 
     def get(self, *args, **kwargs):
         self.load_data(force=kwargs.pop('force', None))
-        return self.inmemory_cache[self.localpath]
+        return self.inmemory_cache[self.absolute_file_path, self.localpath]

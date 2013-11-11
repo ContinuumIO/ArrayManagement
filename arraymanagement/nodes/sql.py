@@ -21,6 +21,11 @@ class SimpleQueryTable(PandasCacheableTable):
         else:
             with open(join(self.basepath, self.relpath)) as f:
                 self.query = f.read()
+
+    def db(self):
+        mod = self.config.get('db_module')
+        return mod.connect(*self.config.get('db_conn_args'))
+    
     def execute_query(self, query=None):
         if query is None:
             query = self.query
