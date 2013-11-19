@@ -2,6 +2,11 @@ import posixpath
 import os
 from os.path import basename, splitext, join, dirname, isdir, isfile
 import pandas as pd
+import logging
+
+from ..exceptions import ArrayManagementException
+
+logger = logging.getLogger(__name__)
 
 class NodeContext(object):
     def __init__(self, urlpath, relpath, basepath, config):
@@ -52,7 +57,11 @@ class Node(object):
         self.context = context
 
     def __getitem__(self, k):
-        return self.get_node(k)
+        try:
+            return self.c.get_node(self.joinurl(k))
+        except ArrayManagementException as e:
+            logger.exception(e)
+            return None
     
     def __repr__(self):
         info = ["type: %s" % self.__class__.__name__,
