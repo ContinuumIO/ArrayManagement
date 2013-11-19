@@ -220,21 +220,24 @@ class PandasCacheableFixed(PandasCacheable):
     """extend this class to define custom pandas nodes
     """
     inmemory_cache = {}
+    def cache_key(self):
+        return self.absolute_file_path, self.localpath
+
     def load_data(self, force=False):
         store = self._get_store()
-        if not force and self.localpath in self.inmemory_cache:
+        if not force and self.cache_key() in self.inmemory_cache:
             return
         if not force and self.localpath in store:
-            self.inmemory_cache[self.absolute_file_path, self.localpath] = self.store.get(
+            self.inmemory_cache[self.cache_key()] = self.store.get(
                 self.localpath)
             return
         data = self.get_data()
         logger.debug("GOT DATA with shape %s, writing to pytables", data.shape)
         self.store.put(self.localpath, data)
-        self.inmemory_cache[self.absolute_file_path, self.localpath] = data
+        self.inmemory_cache[self.cache_key()] = data
         self.store.flush()
         return self
 
     def get(self, *args, **kwargs):
         self.load_data(force=kwargs.pop('force', None))
-        return self.inmemory_cache[self.absolute_file_path, self.localpath]
+        return self.inmemory_cache[self.cache_key()]
