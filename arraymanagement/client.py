@@ -7,16 +7,19 @@ from nodes.dirnodes import DirectoryNode
 from nodes import Node, NodeContext
 import default_loader
 import sys
+import os
 
 class ArrayClient(Node):
     #should modify this to inherit from DirectorNode
     is_group = True
-    def __init__(self, path):
+    def __init__(self, path, group_write=True):
         self.root = abspath(path)
         self.config = NodeConfig.from_paths(self.root, self.root, self)
         if self.root not in sys.path:
             sys.path.append(self.root)
         context = NodeContext("/", ".", self.root, self.config)
+        if group_write:
+            os.umask(2)
         super(ArrayClient, self).__init__(context)
 
     def get_node(self, urlpath):
