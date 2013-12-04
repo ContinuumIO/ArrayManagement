@@ -10,7 +10,9 @@ __version__ = (0, 0, 1)
 setup(
     name = 'arraymanagement',
     version = '.'.join([str(x) for x in __version__]),
-    packages = [],
+    packages = ['arraymanagement',
+                'arraymanagement.nodes',
+                ],
     author = 'Continuum Analytics',
     author_email = 'info@continuum.io',
     url = 'http://github.com/ContinuumIO/ArrayManagement',
