@@ -13,11 +13,38 @@ from ..pathutils import dirsplit
 from . import Node
 import logging
 logger = logging.getLogger(__name__)
+## These classes are a big misleading because all pandas dataframes are stored inside a group.. however 
+## for here, we use pandas conventions, and the group mixin is used for real groups, whereas groups
+## that are used only to contain a pandas object are treated as datasets
 
 class HDFDataGroupMixin(object):
     def put(self, key, *args, **kwargs):
         new_local_path = join(self.localpath, key)
         return self.store.put(new_local_path, *args, **kwargs)
+
+    def remove(self, key):
+        new_local_path = posixpath.join(self.localpath, key)
+        self.store.remove(new_local_path)
+        self.store.flush()
+
+    def put(self, key, value, format='fixed', append=False, min_itemsize={}):
+        if not min_itemsize:
+            min_itemsize = self.min_itemsize
+        new_local_path = posixpath.join(self.localpath, key)
+        if append:
+            format = 'table'
+            replace = False
+        else:
+            replace = True
+        if format == 'table':
+            write_pandas(self.store, new_local_path, value, 
+                         min_itemsize, 
+                         min_item_padding=self.min_item_padding,
+                         chunksize=500000, 
+                         replace=replace)
+        else:
+            self.store.put(new_local_path, value)
+        self.store.flush()
 
 class HDFDataSetMixin(object):
     def select(self, *args, **kwargs):
@@ -28,6 +55,14 @@ class HDFDataSetMixin(object):
 
     def get(self, *args, **kwargs):
         return self.store.get(self.localpath, *args, **kwargs)
+    @property
+    def table(self):
+        node = self.store.get_node(self.localpath)
+        if hasattr(node._v_attrs, 'pandas_type') and \
+                node._v_attrs.pandas_type == 'frame_table':
+            return node.table
+        else:
+            raise Exception, "node does not have a table in it"
 
 pandas_hdf5_cache = {}
 def get_pandas_hdf5(path):
@@ -122,6 +157,8 @@ def write_pandas(store, localpath, df, min_itemsize,
                      chunksize=chunksize, data_columns=True)
 
 class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
+    min_item_padding = 1.1
+    min_itemsize = {}
     def __init__(self, context, localpath="/"):
         super(PandasHDFNode, self).__init__(context)
         self.localpath = localpath
@@ -150,26 +187,10 @@ class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
         new_local_path = posixpath.join(self.localpath, key)
         return PandasHDFNode(self.context, localpath=new_local_path)
 
-    def put(self, key, value, format='fixed', append=False):
-        new_local_path = posixpath.join(self.localpath, key)
-        if append:
-            format = 'table'
-            replace = False
-        else:
-            replace = True
-        if format == 'table':
-            write_pandas(self.store, new_localpath_path, value, 
-                         self.min_itemsize, 
-                         min_item_padding=self.min_item_padding,
-                         chunksize=500000, 
-                         replace=replace)
-        else:
-            self.store.put(new_local_path, value)
-        self.store.flush()
 
 import types
 
-class PandasCacheable(Node):
+class PandasCacheable(Node, HDFDataSetMixin):
     def cache_path(self):
         cache_name = "cache_%s.hdf5" % self.key
         apath = self.absolute_file_path
@@ -189,17 +210,22 @@ class PandasCacheable(Node):
         if get_data:
             self.get_data = types.MethodType(get_data, self)
 
-    def _get_store(self):
-        if not self.store:
+    @property
+    def store(self):
+        if not hasattr(self, '_store') or not self._store:
             cache_path = self.cache_path()
-            self.store = get_pandas_hdf5(cache_path)
-        return self.store
-        
+            self._store = get_pandas_hdf5(cache_path)
+        return self._store
+
+    @store.setter
+    def store(self, val):
+        self._store = val
+
 class PandasCacheableTable(PandasCacheable):
     min_item_padding = 1.1
     min_itemsize = {}
-    def load_data(self, force=False):
-        store = self._get_store()
+    def load_data(self, force=True):
+        store = self.store
         if not force and self.localpath in store.keys():
             return
         data = self.get_data()
@@ -214,7 +240,10 @@ class PandasCacheableTable(PandasCacheable):
 
     def select(self, *args, **kwargs):
         self.load_data(force=kwargs.pop('force', None))
-        return self.store.select(self.localpath, *args, **kwargs)
+        return super(PandasCacheableTable, self).select(*args, **kwargs)
+
+    def sample(self, start=0, stop=5):
+        return self.select(start=start, stop=stop)
 
 class PandasCacheableFixed(PandasCacheable):
     """extend this class to define custom pandas nodes
@@ -223,8 +252,8 @@ class PandasCacheableFixed(PandasCacheable):
     def cache_key(self):
         return self.absolute_file_path, self.localpath
 
-    def load_data(self, force=False):
-        store = self._get_store()
+    def load_data(self, force=True):
+        store = self.store
         if not force and self.cache_key() in self.inmemory_cache:
             return
         if not force and self.localpath in store:

@@ -25,6 +25,14 @@ class SimpleQueryTable(PandasCacheableTable):
     def db(self):
         mod = self.config.get('db_module')
         return mod.connect(*self.config.get('db_conn_args'))
+
+    def execute_query_df(self, query=None):
+        if query is None:
+            query = self.query
+        mod = self.config.get('db_module')
+        with mod.connect(*self.config.get('db_conn_args')) as db:
+            return sql.read_frame(query, db)
+
     
     def execute_query(self, query=None):
         if query is None:
@@ -50,8 +58,8 @@ class SimpleQueryTable(PandasCacheableTable):
             columns.append(name)
         return columns, min_itemsize, dt_fields
 
-    def load_data(self, force=False, batch=False):
-        store = self._get_store()
+    def load_data(self, force=True, batch=False):
+        store = self.store
         if not force and self.localpath in store.keys():
             return
         logger.debug("query executing!")
