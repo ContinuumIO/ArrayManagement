@@ -191,6 +191,15 @@ class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
 import types
 
 class PandasCacheable(Node, HDFDataSetMixin):
+    def __init__(self, context, get_data=None, options={}):
+        self.options = options
+        super(PandasCacheable, self).__init__(context)
+        self.store = None
+        self.localpath = "/" + posixpath.basename(context.urlpath)
+        if get_data:
+            self.get_data = types.MethodType(get_data, self)
+
+
     def cache_path(self):
         cache_name = "cache_%s.hdf5" % self.key
         apath = self.absolute_file_path
@@ -202,13 +211,6 @@ class PandasCacheable(Node, HDFDataSetMixin):
             os.makedirs(cachedir)
         cache_path = join(cachedir, cache_name)
         return cache_path
-
-    def __init__(self, context, get_data=None):
-        super(PandasCacheable, self).__init__(context)
-        self.store = None
-        self.localpath = "/" + posixpath.basename(context.urlpath)
-        if get_data:
-            self.get_data = types.MethodType(get_data, self)
 
     @property
     def store(self):
