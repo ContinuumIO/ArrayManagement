@@ -62,8 +62,7 @@ class Node(object):
         except ArrayManagementException as e:
             logger.exception(e)
             return None
-    
-    def __repr__(self):
+    def repr_data(self):
         info = ["type: %s" % self.__class__.__name__,
                 "urlpath: %s" % self.urlpath,
                 "filepath: %s" % self.relpath]
@@ -73,6 +72,10 @@ class Node(object):
                 info.append('%s keys: %s ...' % (len(keys), ",".join(keys[:display_limit])))
             else:
                 info.append('%s keys: %s ' % (len(keys), ",".join(keys)))
+        return info
+
+    def __repr__(self):
+        info = self.repr_data()
         return "\n".join(info)
 
     @property
