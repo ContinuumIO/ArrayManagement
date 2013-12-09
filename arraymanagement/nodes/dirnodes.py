@@ -12,20 +12,23 @@ from .. import pathutils
 import logging
 logger = logging.getLogger(__name__)
 
-def keys(context, overrides={}):
+def keys(context):
     fnames = os.listdir(context.absolute_file_path)
     fnames = [x for x in fnames if not (x.startswith('cache') and x.endswith('hdf5'))]
     fnames = [x for x in fnames if not x.startswith('.')]
+    urlpaths = [context.joinurl(key) for key in fnames]
     ks = []
     loaders = context.config.get('loaders')
     names = set()
     for pattern in loaders:
-        matches = fnmatch.filter(fnames, pattern)
-        names.update(matches)
+        if "*" in pattern:
+            matches = fnmatch.filter(urlpaths, pattern)
+            names.update([posixpath.basename(x) for x in matches])
+        else:
+            names.add(posixpath.basename(pattern))
     for fname in fnames:
         if isdir(context.joinpath(fname)):
             names.add(fname)
-    names.update(overrides.keys())
     return list(names) 
 
 def dispatch(loader, context):
@@ -60,6 +63,7 @@ def get_node(key, context):
         else:
             fname = None
 
+    abspath = None
     #construct new context
     if fname is None:
         context = context.clone(urlpath=urlpath)
@@ -72,14 +76,18 @@ def get_node(key, context):
     for pattern in loaders:
         if fnmatch.fnmatch(urlpath, pattern):
             return dispatch(loaders[pattern], context)
-    if isdir(abspath):
+    if abspath and isdir(abspath):
         return DirectoryNode(context)
     return None
 
 class DirectoryNode(Node):
     is_group = True
     def keys(self):
-        return keys(self.context)
+        if self.context.config.get('keys'):
+            keyfunc = self.context.config.get('keys')
+            return keyfunc(self.context)
+        else:
+            return keys(self.context)
 
     def get_node(self, key):
         urlpath = self.joinurl(key)

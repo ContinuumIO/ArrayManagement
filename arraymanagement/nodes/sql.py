@@ -62,6 +62,7 @@ class SimpleQueryTable(PandasCacheableTable):
         store = self.store
         if not force and self.localpath in store.keys():
             return
+        import pdb;pdb.set_trace()
         logger.debug("query executing!")
         cur = self.execute_query()
         logger.debug("query returned!")

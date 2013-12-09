@@ -21,7 +21,13 @@ class NodeContext(object):
         self.client = client
         self.key = posixpath.basename(urlpath)
         self.config = self.client.get_config(self.urlpath)
-        
+
+    def __getitem__(self, k):
+        try:
+            return self.c.get_node(self.joinurl(k))
+        except ArrayManagementException as e:
+            logger.exception(e)
+            return None
     @property
     def basepath(self):
         return self.client.root
@@ -65,11 +71,8 @@ class Node(object):
         self.context = context
 
     def __getitem__(self, k):
-        try:
-            return self.c.get_node(self.joinurl(k))
-        except ArrayManagementException as e:
-            logger.exception(e)
-            return None
+        return self.context.__getitem__(k)
+
     def repr_data(self):
         info = ["type: %s" % self.__class__.__name__,
                 "urlpath: %s" % self.urlpath,

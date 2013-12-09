@@ -14,6 +14,7 @@ class ArrayClient(Node):
     is_group = True
     def __init__(self, path, configname="datalib.config", group_write=True):
         self.root = abspath(path)
+        self.debug = True
         if self.root not in sys.path:
             sys.path.append(self.root)
         self.raw_config = __import__(configname, fromlist=[''])
@@ -24,6 +25,11 @@ class ArrayClient(Node):
         super(ArrayClient, self).__init__(context)
 
     def get_config(self, urlpath="/"):
+        if self.debug:
+            if self.raw_config.local_config.get(urlpath) \
+                    and self.raw_config.local_config.get(urlpath).get('__module__'):
+                reload(self.raw_config.local_config.get(urlpath).get('__module__'))
+            reload(self.raw_config)
         config = NodeConfig(urlpath,
                             self.raw_config.global_config, 
                             self.raw_config.local_config)

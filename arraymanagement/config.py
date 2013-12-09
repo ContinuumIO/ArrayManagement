@@ -12,6 +12,24 @@ from nodes import sql
 #import databag
 
 from pathutils import recursive_config_load, get_config
+import collections
+
+def ordered_dict_merge(first, second):
+    """merges 2 ordered dictionaries, overlaying the second
+    on the first, but preserving the keys of the second
+    """
+    # There is probably a better way to do this...
+    output = collections.OrderedDict()
+    for k in first:
+        output[k] = first[k]
+    for k in second:
+        output[k] = second[k]
+    output2 = collections.OrderedDict()
+    for k in second:
+        output2[k] = output[k]
+    for k in first:
+        output2[k] = output[k]
+    return output2
 
 def config_dict_update(old_config, new_config):
     """takes one config dictionary, and updates it with another.
@@ -23,8 +41,7 @@ def config_dict_update(old_config, new_config):
         if k in old_config and k in new_config and \
                 isinstance(old_config[k], dict) and \
                 isinstance(new_config[k], dict):
-            new[k] = old_config[k]
-            new[k].update(new_config[k])
+            new[k] = ordered_dict_merge(old_config[k], new_config[k])
             continue
         if k in old_config:
             new[k]  = old_config[k]
