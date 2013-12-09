@@ -24,10 +24,13 @@ def _dirsplit(path, basepath, maxdepth=10):
         return []
     else:
         dirpath, path = split(path)
-        results = dirsplit(dirpath, basepath, maxdepth=maxdepth - 1)
-        results.append(path)
-        return results
-        
+        if path == "":
+            return []
+        else:
+            results = dirsplit(dirpath, basepath, maxdepth=maxdepth - 1)
+            results.append(path)
+            return results
+
 def dirsplit(path, basepath, maxdepth=10):
     """splits /home/hugo/foo/bar/baz into foo, bar, baz, assuming
     /home/hugo is the basepath
@@ -43,16 +46,16 @@ def dirsplit(path, basepath, maxdepth=10):
 #     else:
 #         return {}
         
-def get_config(relpath, basepath):
-    fpath = abspath(join(basepath, relpath, 'config.py'))
+def get_config(path, basepath):
+    fpath = abspath(path)
     if exists(fpath):
-        directories = dirsplit(relpath, basepath)
-        name = "_".join(directories)
-        name += "_config"
+        directories = dirsplit(path, basepath)
+        name = ".".join(directories)
         mod = imp.load_source(name, fpath)
         return mod.__dict__
     else:
         return {}
+
 def recursive_config_load(path, basepath):
     """recursively loads configs as we traverse from basepath to path
     """

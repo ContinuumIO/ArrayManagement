@@ -3,6 +3,7 @@ import os
 from os.path import join, dirname, exists
 import posixpath
 import copy
+import collections
 from nodes import csvnodes
 from nodes import hdfnodes
 from nodes import dirnodes
@@ -31,45 +32,33 @@ def config_dict_update(old_config, new_config):
             new[k] = new_config[k]
     return new
 
-base_config = dict(
-    is_dataset = False,
-    csv_options = {},
-    table_type_overrides = {},
-    datetime_type = 'datetime64[ns]',
-    loaders = {
-        '*.csv' : csvnodes.PandasCSVNode,
-        '*.CSV' : csvnodes.PandasCSVNode,
-        '*.hdf5' : hdfnodes.PandasHDFNode,
-        '*.h5' : hdfnodes.PandasHDFNode,
-        '*.sql' : sql.SimpleQueryTable,
-        },
-    pattern_priority = []
-    )            
+# base_config = dict(
+#     is_dataset = False,
+#     csv_options = {},
+#     table_type_overrides = {},
+#     datetime_type = 'datetime64[ns]',
+#     loaders = {
+#         '*.csv' : csvnodes.PandasCSVNode,
+#         '*.CSV' : csvnodes.PandasCSVNode,
+#         '*.hdf5' : hdfnodes.PandasHDFNode,
+#         '*.h5' : hdfnodes.PandasHDFNode,
+#         '*.sql' : sql.SimpleQueryTable,
+#         },
+#     pattern_priority = []
+#     )            
+
 class NodeConfig(object):
-    def __init__(self, path, basepath, config, client):
-        self.config = config
-        self.path = path
-        self.basepath = basepath
-        #self.md = databag.DataBag(fpath=join(basepath, "__md.db"))
-        self.client = client
-        
-    @classmethod
-    def from_paths(cls, path, basepath, client):
-        config = recursive_config_load(path, basepath)
-        config = config_dict_update(base_config, config)
-        return cls(path, basepath, config, client)
+    def __init__(self, url, global_config, local_configs):
+        local_config = local_configs.get(url, {})
+        local_loaders = local_config.get('loaders', {})
+        new_loaders = collections.OrderedDict()
+        for key, loader in local_loaders.iteritems():
+            new_key = posixpath.join(url, key)
+            new_loaders[new_key] = loader
+        local_config['loaders'] = new_loaders
+        self.config = config_dict_update(global_config, local_config)
 
     def get(self, key):
         return self.config.get(key, getattr(self, key, None))
 
-    def clone_and_update(self, relpath):
-        """clones this node, and updates from a config in path
-        """
-        old_config = copy.copy(self.config)
-        new_config = get_config(join(self.basepath, relpath), self.basepath)
-        new = config_dict_update(old_config, new_config)
-        return NodeConfig(relpath, self.basepath, new, self.client)
-        
-    
-        
         

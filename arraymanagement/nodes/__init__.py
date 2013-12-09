@@ -1,6 +1,6 @@
 import posixpath
 import os
-from os.path import basename, splitext, join, dirname, isdir, isfile
+from os.path import basename, splitext, join, dirname, isdir, isfile, relpath
 import pandas as pd
 import logging
 
@@ -9,7 +9,7 @@ from ..exceptions import ArrayManagementException
 logger = logging.getLogger(__name__)
 
 class NodeContext(object):
-    def __init__(self, urlpath, relpath, basepath, config):
+    def __init__(self, urlpath, absolute_file_path, client):
         """    
         urlpath : urlpath to this location
         relpath : file path to this location from relative to basepath
@@ -17,11 +17,18 @@ class NodeContext(object):
         config : instance of arraymanagement.config.NodeConfig
         """
         self.urlpath = urlpath
-        self.relpath = relpath
-        self.basepath = basepath
-        self.config = config
-        self.absolute_file_path = join(basepath, relpath)
+        self.absolute_file_path = absolute_file_path
+        self.client = client
         self.key = posixpath.basename(urlpath)
+        self.config = self.client.get_config(self.urlpath)
+        
+    @property
+    def basepath(self):
+        return self.client.root
+
+    @property 
+    def relpath(self):
+        return relpath(self.absolute_file_path, self.basepath)
 
     def joinurl(self, path):
         return posixpath.normpath(posixpath.join(self.urlpath, path))
@@ -34,16 +41,17 @@ class NodeContext(object):
 
     @property
     def c(self):
-        return self.config.client
+        return self.client
 
     def clone(self, **kwargs):
         args = {'urlpath' : self.urlpath, 
-                'relpath' : self.relpath, 
-                'basepath' : self.basepath, 
-                'config' : self.config}
+                'absolute_file_path' : self.absolute_file_path,
+                'client' : self.client}
         args.update(kwargs)
-        return self.__class__(args['urlpath'], args['relpath'], 
-                              args['basepath'], args['config'])
+        return self.__class__(args['urlpath'], 
+                              args['absolute_file_path'],
+                              args['client']
+                              )
         
 display_limit=100
 class Node(object):
