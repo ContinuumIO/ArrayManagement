@@ -65,12 +65,14 @@ class HDFDataSetMixin(object):
             raise Exception, "node does not have a table in it"
 
 pandas_hdf5_cache = {}
+
 def get_pandas_hdf5(path):
     store = pandas_hdf5_cache.get(path)
     if store is None or store._handle.isopen == 0:
         store = pd.HDFStore(path, complib='blosc')
         pandas_hdf5_cache[path] = store
     return store
+
 def hack_pandas_ns_issue(col):
     col[col > dt.datetime(2250,1,1)] = dt.datetime(2250,1,1)
     col = col.astype('datetime64[ns]')
@@ -214,7 +216,7 @@ class PandasCacheable(Node, HDFDataSetMixin):
 
     @property
     def store(self):
-        if not hasattr(self, '_store') or not self._store:
+        if not hasattr(self, '_store') or self._store is None:
             cache_path = self.cache_path()
             self._store = get_pandas_hdf5(cache_path)
         return self._store
