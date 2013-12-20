@@ -8,6 +8,8 @@ from nodes import Node, NodeContext
 import default_loader
 import sys
 import os
+import shutil
+from . import clear_mem_cache
 
 class ArrayClient(Node):
     #should modify this to inherit from DirectorNode
@@ -50,7 +52,19 @@ class ArrayClient(Node):
 
     def keys(self):
         return self.get_node('/').keys()
-            
-        
+    
+    def clear_mem_cache(self):
+        clear_mem_cache()
+
+    def clear_disk_cache(self, url=None):
+        if url is None:
+            path = self.root
+        else:
+            names = pathutils.urlsplit(url, "/")
+            path = join(self.root, *names)
+        for dirpath, dirnames, filenames in os.walk(path):
+            if os.path.split(dirpath)[-1] == ".cache":
+                shutil.rmtree(dirpath)
+                
 
     
