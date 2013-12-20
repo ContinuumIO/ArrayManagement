@@ -1,17 +1,16 @@
 from arraymanagement.nodes.hdfnodes import PandasCacheableTable
+import pandas as pd
+from posixpath import join
 import collections
 
-class MyCSVNode(PandasCacheableTable):
-    is_group = False
-    def get_data(self):
-        fname = join(self.basepath, self.relpath)
-        data = pd.read_csv(fname, **self.config.get('csv_options'))
-        data['values'] = data['values'] * 2
-        return data
+def get_data(self):
+    data = self["../sample.csv"].get().copy()
+    data['values'] = data['values'] * 2
+    return data
 
 
 loaders = collections.OrderedDict([
-        ('sample2', MyCSVNode)
+        ('sample2', (PandasCacheableTable, {'get_data' : get_data}))
         ])
 
 config = {'loaders' : loaders}
