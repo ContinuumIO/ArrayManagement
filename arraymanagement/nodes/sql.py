@@ -58,10 +58,8 @@ class SimpleQueryTable(PandasCacheableTable):
             columns.append(name)
         return columns, min_itemsize, dt_fields
 
-    def load_data(self, force=True, batch=False):
+    def load_data(self, batch=False):
         store = self.store
-        if not force and self.localpath in store.keys():
-            return
         logger.debug("query executing!")
         cur = self.execute_query()
         logger.debug("query returned!")
