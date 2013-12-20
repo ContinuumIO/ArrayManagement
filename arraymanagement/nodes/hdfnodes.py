@@ -193,14 +193,21 @@ class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
 import types
 
 class PandasCacheable(Node, HDFDataSetMixin):
-    def __init__(self, context, get_data=None, options={}):
+    def __init__(self, context, get_data=None, load_data=None, options={}):
         self.options = options
         super(PandasCacheable, self).__init__(context)
         self.store = None
         self.localpath = "/" + posixpath.basename(context.urlpath)
         if get_data:
             self.get_data = types.MethodType(get_data, self)
+        if load_data:
+            self.load_data = types.MethodType(load_data, self)
 
+    def _load_data(self, force=True):
+        store = self.store
+        if force or self.localpath not in store.keys():
+            self.load_data()
+        return self
 
     def cache_path(self):
         cache_name = "cache_%s.hdf5" % self.key
@@ -228,10 +235,8 @@ class PandasCacheable(Node, HDFDataSetMixin):
 class PandasCacheableTable(PandasCacheable):
     min_item_padding = 1.1
     min_itemsize = {}
-    def load_data(self, force=True):
-        store = self.store
-        if not force and self.localpath in store.keys():
-            return
+    #rename this later
+    def load_data(self):
         data = self.get_data()
         logger.debug("GOT DATA with shape %s for %s, writing to pytables", data.shape, self.urlpath)
         write_pandas(self.store, self.localpath, data, 
@@ -240,10 +245,10 @@ class PandasCacheableTable(PandasCacheable):
                      chunksize=500000, 
                      replace=True)
         self.store.flush()
-        return self
+        
 
     def select(self, *args, **kwargs):
-        self.load_data(force=kwargs.pop('force', None))
+        self._load_data(force=kwargs.pop('force', None))
         return super(PandasCacheableTable, self).select(*args, **kwargs)
 
     def sample(self, start=0, stop=5):
@@ -256,21 +261,14 @@ class PandasCacheableFixed(PandasCacheable):
     def cache_key(self):
         return self.absolute_file_path, self.localpath
 
-    def load_data(self, force=True):
-        store = self.store
+    def _load_data(self, force=True):
         if not force and self.cache_key() in self.inmemory_cache:
             return
-        if not force and self.localpath in store:
-            self.inmemory_cache[self.cache_key()] = self.store.get(
-                self.localpath)
-            return
-        data = self.get_data()
-        logger.debug("GOT DATA with shape %s, writing to pytables", data.shape)
-        self.store.put(self.localpath, data)
+        super(PandasCacheableFixed, self)._load_data(force=force)
+        data = self.store.get(self.localpath)
         self.inmemory_cache[self.cache_key()] = data
-        self.store.flush()
         return self
-
+    
     def get(self, *args, **kwargs):
-        self.load_data(force=kwargs.pop('force', None))
+        self._load_data(force=kwargs.pop('force', None))
         return self.inmemory_cache[self.cache_key()]
