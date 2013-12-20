@@ -4,6 +4,17 @@ from os import makedirs
 import json
 
 from arraymanagement.client import ArrayClient
+
+def setup_module():
+    basepath = join(dirname(dirname(__file__)), 'example')
+    client = ArrayClient(basepath)
+    client.clear_disk_cache()
+
+def teardown_module():
+    basepath = join(dirname(dirname(__file__)), 'example')
+    client = ArrayClient(basepath)
+    client.clear_disk_cache()
+
 def test_csv_node():
     basepath = join(dirname(dirname(__file__)), 'example')
     client = ArrayClient(basepath)
