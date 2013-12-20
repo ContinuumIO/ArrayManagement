@@ -260,6 +260,13 @@ class PandasCacheableFixed(PandasCacheable):
     inmemory_cache = {}
     def cache_key(self):
         return self.absolute_file_path, self.localpath
+    
+    def load_data(self):
+        data = self.get_data()
+        logger.debug("GOT DATA with shape %s for %s, writing to pytables",
+                     data.shape, self.urlpath)
+        self.store.put(self.localpath, data)
+        self.store.flush()
 
     def _load_data(self, force=True):
         if not force and self.cache_key() in self.inmemory_cache:
