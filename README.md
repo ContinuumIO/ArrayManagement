@@ -1,5 +1,6 @@
 ArrayManagement
 ===============
+THESE DOCS ARE HEAVILY OUT OF DATE....
 
 Tools for working and ingesting different types of arrays.  This will be wrapped by a variety of servers 
 [http](https://github.com/ContinuumIO/blaze-web), ZeroMQ, etc..
