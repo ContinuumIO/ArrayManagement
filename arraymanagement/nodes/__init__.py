@@ -55,16 +55,21 @@ class NodeContext(object):
     def clone(self, **kwargs):
         args = {'urlpath' : self.urlpath, 
                 'absolute_file_path' : self.absolute_file_path,
-                'client' : self.client}
+                'client' : self.client,
+                'parent_config' : self.config.config
+                }
         args.update(kwargs)
         return self.__class__(args['urlpath'], 
                               args['absolute_file_path'],
-                              args['client']
+                              args['client'],
+                              parent_config=args['parent_config']
                               )
         
 display_limit=100
 class Node(object):
-    def __init__(self, context):
+    config_fields = []
+
+    def __init__(self, context, **kwargs):
         self.urlpath = context.urlpath
         self.relpath = context.relpath
         self.basepath = context.basepath
@@ -72,6 +77,13 @@ class Node(object):
         self.absolute_file_path = context.absolute_file_path
         self.key = context.key
         self.context = context
+        for field in self.config_fields:
+            if field in kwargs:
+                setattr(self, field, kwargs.pop(field))
+            elif self.config.get(field):
+                setattr(self, field, self.config.get(field))
+            else:
+                setattr(self, field, None)
 
     def __getitem__(self, k):
         return self.context.__getitem__(k)
