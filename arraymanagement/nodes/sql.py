@@ -25,6 +25,23 @@ def query_info(cur, min_itemsize, db_string_types, db_datetime_types):
     return columns, min_itemsize, dt_fields
 class SimpleQueryTable(PandasCacheableTable):
     is_group = False
+    config_fields = [
+        'query',
+        #args to pass into connect
+        'db_module',
+        #args to pass into connect                     
+        'db_conn_args',
+        'db_conn_kwargs',
+        #types in cursor description which represent
+        'db_string_types',
+        #types in cursor description which are datetime types
+        'db_datetime_types',
+        #column name to type mappings
+        'col_types',
+        # minimum column sizes 
+        'min_itemsize',
+        ]
+
     def __init__(self, *args, **kwargs):
         query = None
         if 'query' in kwargs:
@@ -38,7 +55,7 @@ class SimpleQueryTable(PandasCacheableTable):
 
     def db(self):
         mod = self.db_module
-        return mod.connect(*self.db_conn_args)
+        return mod.connect(*self.db_conn_args, **self.db_conn_kwargs)
 
     def execute_query_df(self, query=None):
         if query is None:
@@ -61,7 +78,7 @@ class SimpleQueryTable(PandasCacheableTable):
         logger.debug("query returned!")
         logger.debug("cursor descr %s", cur.description)
         
-        min_itemsize = self.min_itemsize if self.min_itemsize else {},
+        min_itemsize = self.min_itemsize if self.min_itemsize else {}
         db_string_types = self.db_string_types if self.db_string_types else []
         db_datetime_types = self.db_datetime_types if self.db_datetime_types else []
         
@@ -73,10 +90,10 @@ class SimpleQueryTable(PandasCacheableTable):
             )
         self.min_itemsize = min_itemsize
         logger.debug("queryinfo %s", str((columns, min_itemsize, dt_fields)))
-        overrides = self.config.get('table_type_overrides').get(self.key, {})
-        datetime_type = self.config.get('datetime_type')
-        dt_overrides = overrides.setdefault(datetime_type, [])
-        dt_overrides += dt_fields
+        overrides = self.col_types
+        overrides = self.col_types
+        for k in dt_fields:
+            overrides[k] = 'datetime64[ns]'
         write_pandas_hdf_from_cursor(self.store, self.localpath, cur, 
                                      columns, self.min_itemsize, 
                                      dtype_overrides=overrides,

@@ -6,7 +6,6 @@ from arraymanagement.nodes.sql import SimpleQueryTable
 global_config = dict(
     is_dataset = False,
     csv_options = {},
-    table_type_overrides = {},
     datetime_type = 'datetime64[ns]',
     loaders = {
         '*.csv' : PandasCSVNode,
@@ -15,13 +14,15 @@ global_config = dict(
         '*.h5' : PandasHDFNode,
         '*.sql' : SimpleQueryTable,
         },
-    pattern_priority = []
     )            
 
 import custom
 import customcsvs
+import sqlviews
+
 local_config = {
     '/custom' : custom.config,
-    '/customcsvs' : customcsvs.config
+    '/customcsvs' : customcsvs.config,
+    '/sqlviews' : sqlviews.config
     }
 

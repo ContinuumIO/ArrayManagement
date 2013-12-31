@@ -53,3 +53,10 @@ def test_csv_node():
     node = client.get_node('/customcsvs/sample_pipe')
     data3 = node.select()
     #better check later
+
+def test_sql_node():
+    basepath = join(dirname(dirname(__file__)), 'example')
+    client = ArrayClient(basepath)
+    aapl = client['/sqlviews/AAPL'].select()
+    assert aapl.shape == (7850,3)
+    
