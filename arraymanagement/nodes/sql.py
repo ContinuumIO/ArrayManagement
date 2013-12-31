@@ -54,21 +54,6 @@ class SimpleQueryTable(PandasCacheableTable):
             cur.execute(self.query)
             return cur
 
-    def query_info(self, cur):
-        min_itemsize = {}
-        columns = []
-        dt_fields = []
-        for col_desc in cur.description:
-            name = col_desc[0]
-            dtype = col_desc[1]
-            length = col_desc[3]
-            if dtype in self.config.get('db_string_types'):
-                min_itemsize[name] = length
-            if dtype in self.config.get('db_datetime_types'):
-                dt_fields.append(name)
-            columns.append(name)
-        return columns, min_itemsize, dt_fields
-
     def load_data(self):
         store = self.store
         logger.debug("query executing!")
@@ -80,7 +65,7 @@ class SimpleQueryTable(PandasCacheableTable):
         db_string_types = self.db_string_types if self.db_string_types else []
         db_datetime_types = self.db_datetime_types if self.db_datetime_types else []
         
-        columns, min_itemsize, dt_fields = self.query_info(
+        columns, min_itemsize, dt_fields = query_info(
             cur,
             min_itemsize=min_itemsize,
             db_string_types=db_string_types,
