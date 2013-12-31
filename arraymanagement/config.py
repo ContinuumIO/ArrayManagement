@@ -65,17 +65,16 @@ def config_dict_update(old_config, new_config):
 #     )            
 
 class NodeConfig(object):
-    def __init__(self, url, global_config, local_configs):
-        local_config = local_configs.get(url, {})
-        local_loaders = local_config.get('loaders', {})
-        new_loaders = collections.OrderedDict()
-        for key, loader in local_loaders.iteritems():
-            new_key = posixpath.join(url, key)
-            new_loaders[new_key] = loader
-        local_config['loaders'] = new_loaders
-        self.config = config_dict_update(global_config, local_config)
+    def __init__(self, url, parent_config, local_config):
+        # local_loaders = local_config.get('loaders', {})
+        # new_loaders = collections.OrderedDict()
+        # for key, loader in local_loaders.iteritems():
+        #     new_key = posixpath.join(url, key)
+        #     new_loaders[new_key] = loader
+        # local_config['loaders'] = new_loaders
+        self.config = config_dict_update(parent_config, local_config)
 
-    def get(self, key):
-        return self.config.get(key, getattr(self, key, None))
+    def get(self, key, default=None):
+        return self.config.get(key, getattr(self, key, default))
 
         
