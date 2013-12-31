@@ -26,15 +26,17 @@ class ArrayClient(Node):
             os.umask(2)
         super(ArrayClient, self).__init__(context)
 
-    def get_config(self, urlpath="/"):
+    def get_config(self, urlpath="/", parent_config=None):
+        if parent_config is None:
+            parent_config = self.raw_config.global_config
         if self.debug:
             if self.raw_config.local_config.get(urlpath) \
                     and self.raw_config.local_config.get(urlpath).get('__module__'):
                 reload(self.raw_config.local_config.get(urlpath).get('__module__'))
             reload(self.raw_config)
         config = NodeConfig(urlpath,
-                            self.raw_config.global_config, 
-                            self.raw_config.local_config)
+                            parent_config,
+                            self.raw_config.local_config.get(urlpath, {}))
         return config
         
         
