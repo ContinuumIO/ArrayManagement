@@ -9,7 +9,9 @@ from ..exceptions import ArrayManagementException
 logger = logging.getLogger(__name__)
 
 class NodeContext(object):
-    def __init__(self, urlpath, absolute_file_path, client):
+    def __init__(self, urlpath, absolute_file_path, client, 
+                 parent_config=None):
+
         """    
         urlpath : urlpath to this location
         relpath : file path to this location from relative to basepath
@@ -20,8 +22,9 @@ class NodeContext(object):
         self.absolute_file_path = absolute_file_path
         self.client = client
         self.key = posixpath.basename(urlpath)
-        self.config = self.client.get_config(self.urlpath)
-
+        self.config = self.client.get_config(urlpath=self.urlpath, 
+                                             parent_config=parent_config)
+                
     def __getitem__(self, k):
         try:
             return self.c.get_node(self.joinurl(k))
