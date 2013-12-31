@@ -9,6 +9,20 @@ from arraymanagement.nodes.hdfnodes import PandasCacheableTable, write_pandas_hd
 
 logger = logging.getLogger(__name__)
 
+def query_info(cur, min_itemsize, db_string_types, db_datetime_types):
+    columns = []
+    dt_fields = []
+    for col_desc in cur.description:
+        name = col_desc[0]
+        dtype = col_desc[1]
+        length = col_desc[3]
+        if dtype in db_string_types:
+            if length:
+                min_itemsize[name] = length
+        if dtype in db_datetime_types:
+            dt_fields.append(name)
+        columns.append(name)
+    return columns, min_itemsize, dt_fields
 class SimpleQueryTable(PandasCacheableTable):
     is_group = False
     def __init__(self, *args, **kwargs):
@@ -23,22 +37,19 @@ class SimpleQueryTable(PandasCacheableTable):
                 self.query = f.read()
 
     def db(self):
-        mod = self.config.get('db_module')
-        return mod.connect(*self.config.get('db_conn_args'))
+        mod = self.db_module
+        return mod.connect(*self.db_conn_args)
 
     def execute_query_df(self, query=None):
         if query is None:
             query = self.query
-        mod = self.config.get('db_module')
-        with mod.connect(*self.config.get('db_conn_args')) as db:
+        with self.db() as db:
             return sql.read_frame(query, db)
-
     
     def execute_query(self, query=None):
         if query is None:
             query = self.query
-        mod = self.config.get('db_module')
-        with mod.connect(*self.config.get('db_conn_args')) as db:
+        with self.db() as db:
             cur = db.cursor()
             cur.execute(self.query)
             return cur
@@ -58,19 +69,25 @@ class SimpleQueryTable(PandasCacheableTable):
             columns.append(name)
         return columns, min_itemsize, dt_fields
 
-    def load_data(self, batch=False):
+    def load_data(self):
         store = self.store
         logger.debug("query executing!")
         cur = self.execute_query()
         logger.debug("query returned!")
         logger.debug("cursor descr %s", cur.description)
-        columns, min_itemsize, dt_fields = self.query_info(cur)
+        
+        min_itemsize = self.min_itemsize if self.min_itemsize else {},
+        db_string_types = self.db_string_types if self.db_string_types else []
+        db_datetime_types = self.db_datetime_types if self.db_datetime_types else []
+        
+        columns, min_itemsize, dt_fields = self.query_info(
+            cur,
+            min_itemsize=min_itemsize,
+            db_string_types=db_string_types,
+            db_datetime_types=db_datetime_types
+            )
         self.min_itemsize = min_itemsize
         logger.debug("queryinfo %s", str((columns, min_itemsize, dt_fields)))
-        if batch:
-            logger.debug("batching results!")
-            cur = cur.fetchall()
-            logger.debug("batching done!")
         overrides = self.config.get('table_type_overrides').get(self.key, {})
         datetime_type = self.config.get('datetime_type')
         dt_overrides = overrides.setdefault(datetime_type, [])
@@ -83,21 +100,3 @@ class SimpleQueryTable(PandasCacheableTable):
                                      replace=True)
         cur.close()
         self.store.flush()
-
-class SimpleParameterizedQueryTable(SimpleQueryTable):
-    @property
-    def query(self):
-        key = posixpath.basename(self.urlpath)
-        return self._query % key
-
-    @query.setter
-    def querysetter(self, val):
-        self._query = val
-
-    def execute_query(self):
-        key = posixpath.basename(self.urlpath)
-        mod = self.config.get('db_module')
-        with mod.connect(*self.config.get('db_conn_args')) as db:
-            cur = db.cursor()
-            cur.execute(self.query)
-            return cur
