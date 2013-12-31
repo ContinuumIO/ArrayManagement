@@ -12,6 +12,7 @@ from ..exceptions import ArrayManagementException
 from ..pathutils import dirsplit
 from . import Node
 import logging
+import math
 logger = logging.getLogger(__name__)
 ## These classes are a big misleading because all pandas dataframes are stored inside a group.. however 
 ## for here, we use pandas conventions, and the group mixin is used for real groups, whereas groups
@@ -77,14 +78,15 @@ def hack_pandas_ns_issue(col):
     col[col > dt.datetime(2250,1,1)] = dt.datetime(2250,1,1)
     col = col.astype('datetime64[ns]')
     return col
+
 def override_hdf_types(df, overrides):
-    for dtype, override_cols in overrides.iteritems():
-        for col in override_cols:
-            if col in df:
-                if 'datetime' in dtype:
-                    df[col] = hack_pandas_ns_issue(df[col])
-                else:
-                    df[col] = df[col].astype(dtype)
+    for col in df.columns:
+        if col in overrides:
+            dtype = overrides[col]
+            if 'datetime' in dtype:
+                df[col] = hack_pandas_ns_issue(df[col])
+            else:
+                df[col] = df[col].values.astype(dtype)
     return df
         
 def write_pandas_hdf_from_cursor(store, localpath, cursor, columns, min_itemsize, 
@@ -142,7 +144,7 @@ def write_pandas(store, localpath, df, min_itemsize,
         if v == 'unknown':
             v = max(len(x) for x in df[k])
             v *= min_item_padding
-            v = int(round(v))
+            v = int(math.ceil(v))
             logger.debug("using minsize of %s for %s", v, k)
             min_itemsize[k] = v
     if replace:
@@ -193,9 +195,11 @@ class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
 import types
 
 class PandasCacheable(Node, HDFDataSetMixin):
-    def __init__(self, context, get_data=None, load_data=None, options={}):
+    config_fields = []
+    def __init__(self, context, get_data=None, load_data=None, options={}, 
+                 **kwargs):
         self.options = options
-        super(PandasCacheable, self).__init__(context)
+        super(PandasCacheable, self).__init__(context, **kwargs)
         self.store = None
         self.localpath = "/" + posixpath.basename(context.urlpath)
         if get_data:
@@ -245,7 +249,7 @@ class PandasCacheableTable(PandasCacheable):
                      chunksize=500000, 
                      replace=True)
         self.store.flush()
-        
+        return self
 
     def select(self, *args, **kwargs):
         self._load_data(force=kwargs.pop('force', None))
