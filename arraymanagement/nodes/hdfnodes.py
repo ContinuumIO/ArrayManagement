@@ -117,7 +117,8 @@ def write_pandas_hdf_from_cursor(store, localpath, cursor, columns, min_itemsize
                          chunksize=chunksize, data_columns=True)
             store.flush()
     while True:
-        d = cursor.fetchmany(cursor.arraysize)
+        #
+        d = cursor.fetchmany(chunksize)
         count += len(d)
         global_count += len(d)
         data.extend(d)
