@@ -257,7 +257,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         if cache_info is None:
             self.cache_data(query_params)
             cache_info = self.cache_info(query_params)
-        start_row, end_row = cachhdfe_info
+        start_row, end_row = cache_info
         if not where:
             where = None
         result = self.store.select(self.localpath, where=where,
