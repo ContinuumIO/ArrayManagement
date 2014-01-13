@@ -59,7 +59,7 @@ def test_sql_node():
     basepath = join(dirname(dirname(__file__)), 'example')
     client = ArrayClient(basepath)
     aapl = client['/sqlviews/AAPL'].select()
-    assert aapl.shape == (7850,3)
+    assert aapl.shape == (3925,3)
     
 def test_sql_cache():
     basepath = join(dirname(dirname(__file__)), 'example')
