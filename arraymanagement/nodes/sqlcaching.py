@@ -5,6 +5,7 @@ import pandas as pd
 from pandas.io import sql
 import json
 import logging
+import itertools
 
 from arraymanagement.nodes.hdfnodes import (PandasCacheableTable, 
                                             write_pandas_hdf_from_cursor,
@@ -119,8 +120,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         return col_types
 
     def store_cache_spec(self, query_params, start_row, end_row):
-        data = pd.Series(self.parameter_dict(query_params))
-        data = pd.DataFrame(data).transpose()
+        data = pd.DataFrame(self.parameter_dict(query_params), index=[0])
         data['_start_row'] = start_row
         data['_end_row'] = end_row
         min_itemsize = self.cache_spec_min_itemsize()
@@ -135,6 +135,8 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         try:
             result = self.store.select('cache_spec', where=query)
         except KeyError:
+            return None
+        if result is None:
             return None
         if result.shape[0] == 0:
             return None
@@ -165,7 +167,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
     
     def cache_query(self, query_params):
         params = self.parameter_dict(query_params)
-        q = """select * from (%s) where %s"""
+        q = """select * from (%s) as X where %s"""
         filter_clause = self.filter_sql(**query_params)
         filter_clause = str(filter_clause)
         q = q % (self.query, filter_clause)
@@ -173,7 +175,9 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
     
     def cache_data(self, query_params):
         q = self.cache_query(query_params)
+        print q
         params = self.parameter_dict(query_params)
+        print params
         cur = self.session.execute(q, params)
         
         min_itemsize = self.min_itemsize if self.min_itemsize else {}
@@ -199,7 +203,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
             overrides[k] = 'datetime64[ns]'
         try:
             starting_row = self.table.nrows
-        except:
+        except AttributeError:
             starting_row = 0
         write_pandas_hdf_from_cursor(self.store, self.localpath, cur, 
                                      columns, self.min_itemsize, 
@@ -207,7 +211,10 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
                                      min_item_padding=self.min_item_padding,
                                      chunksize=50000, 
                                      replace=False)
-        ending_row = self.table.nrows
+        try:
+            ending_row = self.table.nrows
+        except AttributeError:
+            ending_row = 0
         self.store_cache_spec(query_params, starting_row, ending_row)
 
     def load_data(self):
@@ -223,15 +230,34 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
             where.append(field, "<=", val_range[1])
         where += kwargs.pop('where', [])
         return where
-
+    
     def select(self, **kwargs):
+        for field in self.cache_discrete_fields:
+            if not isinstance(kwargs.get(field), (list, tuple)):
+                kwargs[field] = [kwargs.get(field)]
+        vals = [kwargs.get(x) for x in self.cache_discrete_fields]
+        discrete_vals = itertools.product(*vals)
+        query_params = []
+        for discrete_val in discrete_vals:
+            query_param = dict(zip(self.cache_discrete_fields, discrete_val))
+            for field in self.cache_continuous_fields:
+                query_param[field] = kwargs.get(field)
+            query_params.append(query_param)
+        results = []
+        for query_param in query_params:
+            result = self._single_select(where=kwargs.get('where', None),
+                                         **query_param)
+            results.append(result)
+        return pd.concat(results)
+
+    def _single_select(self, **kwargs):
         query_params = kwargs
         where = query_params.pop('where')
         cache_info = self.cache_info(query_params)
         if cache_info is None:
             self.cache_data(query_params)
             cache_info = self.cache_info(query_params)
-        start_row, end_row = cache_info
+        start_row, end_row = cachhdfe_info
         if not where:
             where = None
         result = self.store.select(self.localpath, where=where,
