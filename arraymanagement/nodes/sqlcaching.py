@@ -237,6 +237,16 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         result = self.store.select(self.localpath, where=where,
                                    start=start_row, stop=end_row)
         return result
-
-
-        
+    def repr_data(self):
+        repr_data = super(DumbParameterizedQueryTable, self).repr_data()
+        repr_data.append("query: %s" % self.query)
+        repr_data.append("discrete_fields: %s" % self.cache_discrete_fields)
+        repr_data.append("continuous_fields: %s" % self.cache_continuous_fields)
+        discrete_args = ["%s=%s" % (x, x) for x in self.cache_discrete_fields]
+        continuous_args = ["%s=[%s_start, %s_end]" % (x, x, x) \
+                               for x in self.cache_continuous_fields]
+        args = discrete_args + continuous_args + ["where=[extra_terms]"]
+        args = ", ".join(args)
+        cmd = "select(%s)" % args
+        repr_data.append("syntax: %s" % cmd)
+        return repr_data
