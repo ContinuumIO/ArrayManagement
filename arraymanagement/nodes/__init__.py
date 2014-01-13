@@ -80,7 +80,7 @@ class Node(object):
         for field in self.config_fields:
             if field in kwargs:
                 setattr(self, field, kwargs.pop(field))
-            elif self.config.get(field):
+            elif self.config.get(field) is not None:
                 setattr(self, field, self.config.get(field))
             else:
                 setattr(self, field, None)
