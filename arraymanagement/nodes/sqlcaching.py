@@ -7,7 +7,8 @@ from pandas.io import sql
 import json
 import logging
 import itertools
-
+import cPickle as pickle
+import hashlib
 from arraymanagement.nodes.hdfnodes import (PandasCacheableTable, 
                                             write_pandas_hdf_from_cursor,
                                             write_pandas,
@@ -16,7 +17,7 @@ from arraymanagement.nodes.hdfnodes import (PandasCacheableTable,
 from arraymanagement.nodes.hdfnodes import Node
 from arraymanagement.nodes.sql import query_info
 
-from sqlalchemy.sql.expression import bindparam
+from sqlalchemy.sql.expression import bindparam, tuple_
 from sqlalchemy.sql import column, and_
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -108,11 +109,15 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         
     def cache_spec_min_itemsize(self):
         min_itemsize = self.min_itemsize.copy()
+        output = {}
         for field in self.cache_continuous_fields:
             if field in min_itemsize:
-                min_itemsize[field + "_start"] = min_itemsize[field]
-                min_itemsize[field + "_end"] = min_itemsize[field]
-        return min_itemsize
+                output[field + "_start"] = min_itemsize[field]
+                output[field + "_end"] = min_itemsize[field]
+        for field in self.cache_discrete_fields:
+            if field in min_itemsize:
+                output[field] = min_itemsize[field]
+        return output
 
     def cache_spec_col_types(self):
         col_types = self.col_types.copy()
@@ -159,32 +164,26 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
     def filter_sql(self, **kwargs):
         clauses = []
         for field in self.cache_discrete_fields:
-            clauses.append(column(field) == bindparam(field))
+            clauses.append(column(field) == kwargs[field])
         for field in self.cache_continuous_fields:
             val_range = kwargs[field]
-            name = field + "_start"
-            clauses.append(column(field) >= bindparam(name))
-            name = field + "_end"
-            clauses.append(column(field) <= bindparam(name))
+            clauses.append(column(field) >= val_range[0])
+            clauses.append(column(field) <= val_range[1])
         return and_(*clauses)
     
     def cache_query(self, query_params):
-        params = self.parameter_dict(query_params)
-        q = """select * from (%s) as X where %s"""
+        q = """ * from (%s) as X """
+        q = q % self.query
         filter_clause = self.filter_sql(**query_params)
-        filter_clause = str(filter_clause)
-        q = q % (self.query, filter_clause)
-        return q
+        query = self.session.query(q).filter(filter_clause)
+        return query
     
     def cache_data(self, query_params):
         q = self.cache_query(query_params)
-        print q
-        params = self.parameter_dict(query_params)
-        print params
-        cur = self.session.execute(q, params)
+        print str(q)
+        cur = self.session.execute(q)
         
         min_itemsize = self.min_itemsize if self.min_itemsize else {}
-        
         db_string_types = self.db_string_types if self.db_string_types else []
         db_datetime_types = self.db_datetime_types if self.db_datetime_types else []
         
@@ -255,7 +254,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
 
     def _single_select(self, **kwargs):
         query_params = kwargs
-        where = query_params.pop('where')
+        where = query_params.pop('where', None)
         cache_info = self.cache_info(query_params)
         if cache_info is None:
             self.cache_data(query_params)
@@ -279,3 +278,58 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         cmd = "select(%s)" % args
         repr_data.append("syntax: %s" % cmd)
         return repr_data
+    
+def gethashval(obj):
+    m = hashlib.md5()
+    m.update(pickle.dumps(obj))
+    return m.hexdigest()
+
+class BulkParameterizedQueryTable(DumbParameterizedQueryTable):
+    def select(self, **kwargs):
+        for field in self.cache_discrete_fields:
+            if not isinstance(kwargs.get(field), (list, tuple, np.ndarray)):
+                kwargs[field] = [kwargs.get(field)]
+        query_params = kwargs
+        where = query_params.pop('where', None)
+        cache_info = self.cache_info(query_params)
+        if cache_info is None:
+            self.cache_data(query_params)
+            cache_info = self.cache_info(query_params)
+        start_row, end_row = cache_info
+        if not where:
+            where = None
+        result = self.store.select(self.localpath, where=where,
+                                   start=start_row, stop=end_row)
+        
+    def filter_sql(self, **kwargs):
+        clauses = []
+        for field in self.cache_discrete_fields:
+            clauses.append(column(field).in_(kwargs[field]))
+        for field in self.cache_continuous_fields:
+            val_range = kwargs[field]
+            clauses.append(column(field) >= val_range[0])
+            clauses.append(column(field) <= val_range[1])
+        return and_(*clauses)
+        
+    def store_cache_spec(self, query_params, start_row, end_row):
+        data = self.parameter_dict(query_params)
+        hashval = gethashval(data)
+        data = pd.DataFrame({'hashval' : [hashval], 
+                             '_start_row' : start_row,
+                             '_end_row' : end_row})
+        write_pandas(self.store, 'cache_spec', data, {}, 1.1,
+                     replace=False)
+        
+    def cache_info(self, query_params):
+        data = self.parameter_dict(query_params)
+        hashval = gethashval(data)
+        try:
+            result = self.store.select('cache_spec', where=[('hashval', hashval)])
+        except KeyError:
+            return None
+        if result is None:
+            return None
+        if result.shape[0] == 0:
+            return None
+        else:
+            return result['_start_row'], result['_end_row']
