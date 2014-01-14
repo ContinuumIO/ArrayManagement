@@ -300,7 +300,8 @@ class BulkParameterizedQueryTable(DumbParameterizedQueryTable):
             where = None
         result = self.store.select(self.localpath, where=where,
                                    start=start_row, stop=end_row)
-        
+        return result
+
     def filter_sql(self, **kwargs):
         clauses = []
         for field in self.cache_discrete_fields:
@@ -333,3 +334,62 @@ class BulkParameterizedQueryTable(DumbParameterizedQueryTable):
             return None
         else:
             return result['_start_row'], result['_end_row']
+        
+class FlexibleSqlCaching(BulkParameterizedQueryTable):
+    def init_from_file(self):
+        with open(join(self.basepath, self.relpath)) as f:
+            data = f.read()
+            query, fields = data.split("---")
+            self.query = query
+            fields = [x.strip() for x in fields.split(",") \
+                          if x.strip()]
+            self.fields = fields
+            for f in fields:
+                setattr(self, f, column(f))
+                
+    def select(self, query_filter, where=None):
+        cache_info = self.cache_info(query_filter)
+        if cache_info is None:
+            self.cache_data(query_filter)
+            cache_info = self.cache_info(query_filter)
+        start_row, end_row = cache_info
+        if not where:
+            where = None
+        result = self.store.select(self.localpath, where=where,
+                                   start=start_row, stop=end_row)
+        return result
+
+    def cache_query(self, query_filter):
+        q = """ * from (%s) as X """
+        q = q % self.query
+        query = self.session.query(q).filter(query_filter)
+        return query
+    def gethashval(self, query_filter):
+        hashval = gethashval((str(query_filter), 
+                              query_filter.compile().construct_params()))
+        return hashval
+    def store_cache_spec(self, query_filter, start_row, end_row):
+        hashval = self.gethashval(query_filter)
+        data = pd.DataFrame({'hashval' : [hashval], 
+                             '_start_row' : start_row,
+                             '_end_row' : end_row})
+        write_pandas(self.store, 'cache_spec', data, {}, 1.1,
+                     replace=False)
+        
+    def cache_info(self, query_filter):
+        hashval = self.gethashval(query_filter)
+        try:
+            result = self.store.select('cache_spec', where=[('hashval', hashval)])
+        except KeyError:
+            return None
+        if result is None:
+            return None
+        if result.shape[0] == 0:
+            return None
+        else:
+            return result['_start_row'], result['_end_row']
+    def repr_data(self):
+        repr_data = super(DumbParameterizedQueryTable, self).repr_data()
+        repr_data.append("query: %s" % self.query)
+        repr_data.append("fields: %s" % self.fields)
+        return repr_data
