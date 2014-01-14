@@ -1,0 +1,17 @@
+package:
+  name: arraymanagement    
+  version: 0.0.1
+
+source:
+  git_url: git@github.com:ContinuumIO/ArrayManagement.git
+
+requirements:
+  build:
+    - python
+
+  run:
+    - python
+
+about:
+  home: https://github.com/ContinuumIO/ArrayManagement
+  license: BSD
