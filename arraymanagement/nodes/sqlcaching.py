@@ -1,5 +1,6 @@
 import posixpath
 import collections
+import numpy as np
 from os.path import join, relpath
 import pandas as pd
 from pandas.io import sql
@@ -62,8 +63,10 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         with open(join(self.basepath, self.relpath)) as f:
             data = f.read()
             query, discrete_fields, continuous_fields = data.split("---")
-            discrete_fields = [x.strip() for x in discrete_fields.split(",") if x]
-            continuous_fields = [x.strip() for x in continuous_fields.split(",") if x]
+            discrete_fields = [x.strip() for x in discrete_fields.split(",") \
+                                   if x.strip()]
+            continuous_fields = [x.strip() for x in continuous_fields.split(",") \
+                                     if x.strip()]
             self.query = query
             self.cache_discrete_fields = discrete_fields
             self.cache_continuous_fields = continuous_fields
@@ -233,7 +236,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
     
     def select(self, **kwargs):
         for field in self.cache_discrete_fields:
-            if not isinstance(kwargs.get(field), (list, tuple)):
+            if not isinstance(kwargs.get(field), (list, tuple, np.ndarray)):
                 kwargs[field] = [kwargs.get(field)]
         vals = [kwargs.get(x) for x in self.cache_discrete_fields]
         discrete_vals = itertools.product(*vals)
