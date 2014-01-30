@@ -22,6 +22,7 @@ from sqlalchemy.sql import column, and_
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -71,7 +72,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
             self.query = query
             self.cache_discrete_fields = discrete_fields
             self.cache_continuous_fields = continuous_fields
-            
+
     def query_min_itemsize(self):
         try:
             min_itemsize = self.store.select('min_itemsize')
@@ -339,7 +340,7 @@ class FlexibleSqlCaching(BulkParameterizedQueryTable):
     def init_from_file(self):
         with open(join(self.basepath, self.relpath)) as f:
             data = f.read()
-            query, fields = data.split("---")
+            query, fields = data.split("+++")
             self.query = query
             fields = [x.strip() for x in fields.split(",") \
                           if x.strip()]
@@ -392,4 +393,87 @@ class FlexibleSqlCaching(BulkParameterizedQueryTable):
         repr_data = super(DumbParameterizedQueryTable, self).repr_data()
         repr_data.append("query: %s" % self.query)
         repr_data.append("fields: %s" % self.fields)
+        return repr_data
+
+
+class MetaSqlCaching(BulkParameterizedQueryTable):
+    def __init__(self, *args, **kwargs):
+        super(BulkParameterizedQueryTable, self).__init__(*args, **kwargs)
+        if self.query is None:
+            self.init_from_file()
+        self.engine = create_engine(*self.sqlalchemy_args,
+                                    **self.sqlalchemy_kwargs)
+        self.session = sessionmaker(bind=self.engine)()
+        self._build_enums()
+
+    def init_from_file(self):
+        with open(join(self.basepath, self.relpath)) as f:
+            data = f.read()
+            query, meta = data.split("+++")
+            self.query = query
+            self.meta = json.loads(meta)
+
+    def _build_enums(self):
+        if self.meta.has_key('enum_params'):
+            for k in self.meta['enum_params'].keys():
+                v = self.meta['enum_params'][k]
+                if isinstance(v, unicode):
+                    pass
+                    df = self._execute_query_df(v)
+                    setattr(self,k,df)
+                if isinstance(v, list):
+                    setattr(self,k,v)
+
+    def _execute_query_df(self, query=None):
+        #this should really be cached like everything else
+        if query is None:
+            query = self.query
+        results = self.session.execute(query).fetchall()
+        return pd.DataFrame.from_records(results)
+
+    def select(self, query_filter, where=None):
+        cache_info = self.cache_info(query_filter)
+        if cache_info is None:
+            self.cache_data(query_filter)
+            cache_info = self.cache_info(query_filter)
+        start_row, end_row = cache_info
+        if not where:
+            where = None
+        result = self.store.select(self.localpath, where=where,
+                                   start=start_row, stop=end_row)
+        return result
+
+    def cache_query(self, query_filter):
+        q = """ * from (%s) as X """
+        q = q % self.query
+        query = self.session.query(q).filter(query_filter)
+        return query
+    def gethashval(self, query_filter):
+        hashval = gethashval((str(query_filter),
+                              query_filter.compile().construct_params()))
+        return hashval
+    def store_cache_spec(self, query_filter, start_row, end_row):
+        hashval = self.gethashval(query_filter)
+        data = pd.DataFrame({'hashval' : [hashval],
+                             '_start_row' : start_row,
+                             '_end_row' : end_row})
+        write_pandas(self.store, 'cache_spec', data, {}, 1.1,
+                     replace=False)
+
+    def cache_info(self, query_filter):
+        hashval = self.gethashval(query_filter)
+        try:
+            result = self.store.select('cache_spec', where=[('hashval', hashval)])
+        except KeyError:
+            return None
+        if result is None:
+            return None
+        if result.shape[0] == 0:
+            return None
+        else:
+            return result['_start_row'], result['_end_row']
+    def repr_data(self):
+        repr_data = super(DumbParameterizedQueryTable, self).repr_data()
+        repr_data.append("query: %s" % self.query)
+        repr_data.append("meta: %s" % self.meta)
         return repr_data
