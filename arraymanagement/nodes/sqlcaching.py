@@ -64,7 +64,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
     def init_from_file(self):
         with open(join(self.basepath, self.relpath)) as f:
             data = f.read()
-            query, discrete_fields, continuous_fields = data.split("---")
+            query, discrete_fields, continuous_fields = data.split("+++")
             discrete_fields = [x.strip() for x in discrete_fields.split(",") \
                                    if x.strip()]
             continuous_fields = [x.strip() for x in continuous_fields.split(",") \
