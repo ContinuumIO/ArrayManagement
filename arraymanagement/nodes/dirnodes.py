@@ -5,7 +5,7 @@ import pandas as pd
 from ..exceptions import ArrayManagementException
 import fnmatch
 import sys
-
+from hdfnodes import get_pandas_hdf5, write_pandas
 from . import Node
 from .. import pathutils
 
@@ -93,3 +93,22 @@ class DirectoryNode(Node):
         urlpath = self.joinurl(key)
         logger.debug("retrieving url %s", urlpath)
         return get_node(key, self.context)
+    
+    def put(self, key, data, format='fixed', append=False, min_itemsize={}):
+        file_path = join(self.absolute_file_path, key + ".hdf5")
+        store = get_pandas_hdf5(file_path)
+        if append:
+            format = 'table'
+            replace = False
+        else:
+            replace = True
+        if format == 'table':
+            write_pandas(store, "__data__", data, 
+                         min_itemsize, 
+                         chunksize=500000, 
+                         replace=replace)
+        else:
+            store.put("__data__", data)
+        store.flush()
+
+        

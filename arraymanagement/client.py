@@ -68,5 +68,6 @@ class ArrayClient(Node):
             if os.path.split(dirpath)[-1] == ".cache":
                 shutil.rmtree(dirpath)
                 
+        
 
     

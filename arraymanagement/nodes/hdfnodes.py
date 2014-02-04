@@ -170,7 +170,7 @@ class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
         self.store = get_pandas_hdf5(self.absolute_file_path)
         # this will either point to a hdf group, or an hdf table... maybe this is bad idea
         # to do this all in one class but for now...
-        if self.store.keys() == ['__data__']:
+        if self.store.keys() == ['/__data__']:
             self.localpath = "/__data__"
             self.is_group = False
         elif self.localpath in self.store.keys():

@@ -116,3 +116,28 @@ class Node(object):
 
     def rpath(self, path):
         return self.context.rpath(path)
+    
+    def descendant_urls(self, ignore_groups=False):
+        """return urls of descendants. see descendants
+        """
+        nodes = self.descendants(ignore_groups=ignore_groups)
+        return [x.urlpath for x in nodes]
+
+    def descendants(self, ignore_groups=False):
+        """return descendants
+        if ignore_groups is true, only returns descendant arrays, not 
+        descendant directories
+        """
+        descendants = []
+        if not self.is_group:
+            return descendants
+        else:
+            keys = self.keys()
+            for k in keys:
+                node = self[k]
+                descendants.append(node)
+                descendants.extend(node.descendants())
+        if ignore_groups:
+            descendants = [x for x in descendants if not x.is_group]
+        return descendants
+        
