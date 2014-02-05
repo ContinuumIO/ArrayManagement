@@ -25,7 +25,7 @@ from sqlalchemy.orm import sessionmaker
 
 logger = logging.getLogger(__name__)
 
-
+SEP = '+++'
 
 class DumbParameterizedQueryTable(PandasCacheableTable):
     config_fields = ['query',
@@ -64,7 +64,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
     def init_from_file(self):
         with open(join(self.basepath, self.relpath)) as f:
             data = f.read()
-            query, discrete_fields, continuous_fields = data.split("+++")
+            query, discrete_fields, continuous_fields = data.split(SEP)
             discrete_fields = [x.strip() for x in discrete_fields.split(",") \
                                    if x.strip()]
             continuous_fields = [x.strip() for x in continuous_fields.split(",") \
@@ -340,7 +340,7 @@ class FlexibleSqlCaching(BulkParameterizedQueryTable):
     def init_from_file(self):
         with open(join(self.basepath, self.relpath)) as f:
             data = f.read()
-            query, fields = data.split("+++")
+            query, fields = data.split(SEP)
             self.query = query
             fields = [x.strip() for x in fields.split(",") \
                           if x.strip()]
@@ -409,7 +409,7 @@ class MetaSqlCaching(BulkParameterizedQueryTable):
     def init_from_file(self):
         with open(join(self.basepath, self.relpath)) as f:
             data = f.read()
-            query, meta = data.split("+++")
+            query, meta = data.split(SEP)
             self.query = query
             self.meta = json.loads(meta)
 
