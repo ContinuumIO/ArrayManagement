@@ -3,6 +3,8 @@ import datetime as dt
 from os.path import join, dirname, split, realpath, exists
 from os import makedirs
 import json
+from sqlalchemy.sql import and_
+
 
 from arraymanagement.client import ArrayClient
 
@@ -105,3 +107,38 @@ def test_sql_cache():
                                            where=[('c', '==', 513.985)]
                                            )
     assert aapl.shape == (1,3) and aapl.c.iloc[0] == 513.985
+
+def test_sql_new_cache():
+    basepath = join(dirname(dirname(__file__)), 'example')
+    client = ArrayClient(basepath)
+    #query 2012 data
+    aapl = client['/sqlviews/bulkview.bsqlspec'].select(ticker='AAPL',
+                                       date=[dt.datetime(2003,1,1),
+                                             dt.datetime(2012,12,30)],
+                                       )
+    arr = client['/sqlviews/flex_view.fsql']
+    aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(2003,1,1), \
+                                arr.date <= dt.datetime(2012,12,30)))
+    cache = join(basepath,'sqlviews','.cache','cache_flex_view.fsql.hdf5')
+
+    #minimum shifted left
+    aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(1998,1,1), \
+                                arr.date <= dt.datetime(2012,12,30)))
+
+    #minimum and maximum shifted left
+    aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(1998,1,1), \
+                                arr.date <= dt.datetime(2001,12,30)))
+
+    #maximum shifted right
+    aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(2003,1,1), \
+                                arr.date <= dt.datetime(2013,12,30)))
+
+    #maximum and minimum shifted right
+    aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(2013,1,1), \
+                                arr.date <= dt.datetime(2013,12,30)))
+
+    #inner call
+    aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(2004,1,1), \
+                                arr.date <= dt.datetime(2009,12,30)))
+
+    print aapl.head()
