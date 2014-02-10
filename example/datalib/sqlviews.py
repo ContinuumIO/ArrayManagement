@@ -4,6 +4,7 @@ from arraymanagement.nodes.sql import SimpleQueryTable
 from arraymanagement.nodes.sqlcaching import (DumbParameterizedQueryTable,
                                               BulkParameterizedQueryTable,
                                               FlexibleSqlCaching,
+                                              FlexibleSqlDateCaching,
                                               MetaSqlCaching
                                               )
 import collections
@@ -16,6 +17,7 @@ loaders = collections.OrderedDict([
         ("*.sqlspec", DumbParameterizedQueryTable),
         ("*.bsqlspec", BulkParameterizedQueryTable),
         ("*.fsql", FlexibleSqlCaching),
+        ("*.fdsql", FlexibleSqlDateCaching),
         ])
 config = {
     'loaders' : loaders,

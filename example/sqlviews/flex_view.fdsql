@@ -1,0 +1,3 @@
+select stocks.ticker, stock_hist.c, stock_hist.date from stocks inner join stock_hist on stocks.sec_id = stock_hist.sec_id
++++
+date, ticker
