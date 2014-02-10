@@ -4,6 +4,12 @@ from os.path import basename, splitext, join, isfile, isdir, dirname, exists
 import posixpath
 import math
 
+import tables
+from tables.earray import EArray
+from tables.carray import CArray
+from tables.array import Array
+from tables.table import Table
+
 import pandas as pd
 import numpy as np
 import datetime as dt
@@ -73,6 +79,7 @@ def get_pandas_hdf5(path):
         store = pd.HDFStore(path, complib='blosc')
         pandas_hdf5_cache[path] = store
     return store
+
 
 def hack_pandas_ns_issue(col):
     col[col > dt.datetime(2250,1,1)] = dt.datetime(2250,1,1)
@@ -284,3 +291,35 @@ class PandasCacheableFixed(PandasCacheable):
     def get(self, *args, **kwargs):
         self._load_data(force=kwargs.pop('force', None))
         return self.inmemory_cache[self.cache_key()]
+
+
+class PyTables(Node):
+    def __init__(self, context, localpath="/"):
+        super(PyTables, self).__init__(context)
+        self.localpath = localpath
+        self.handle = tables.File(self.absolute_file_path)
+        if self.localpath == "/":
+            children = [x._v_pathname for x in self.handle.list_nodes(self.localpath)]
+            if children == ['/__data__']:
+                self.localpath = "/__data__"
+                self.is_group = False
+        self.node = self.handle.getNode(self.localpath)
+        if isinstance(self.node, (EArray, CArray, Table, Array)):
+            self.is_group = False
+        else:
+            self.is_group = True
+            
+    def keys(self):
+        if not self.is_group:
+            return ArrayManagementException, 'This node is not a group'
+        keys = [x._v_pathname for x in self.handle.list_nodes(self.localpath)]
+        keys = [x for x in keys if x.startswith(self.localpath) and x!= self.localpath]
+        keys = [dirsplit(x, self.localpath)[0] for x in keys]
+        return keys
+
+    def get_node(self, key):
+        if not self.is_group:
+            return ArrayManagementException, 'This node is not a group'
+        new_local_path = posixpath.join(self.localpath, key)
+        return self.__class__(self.context, localpath=new_local_path)
+

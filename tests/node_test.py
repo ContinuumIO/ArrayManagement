@@ -142,3 +142,11 @@ def test_sql_new_cache():
                                 arr.date <= dt.datetime(2009,12,30)))
 
     print aapl.head()
+
+
+def test_pytables_access():
+    basepath = join(dirname(dirname(__file__)), 'example')
+    client = ArrayClient(basepath)
+    assert client["/pytables/array.hdf5/firstgroup"].keys() == []
+    assert client["/pytables/array.hdf5/random_numbers"].node[:].shape == (300,200,100)
+

@@ -1,19 +1,20 @@
 import collections
 from arraymanagement.nodes.csvnodes import PandasCSVNode
-from arraymanagement.nodes.hdfnodes import PandasHDFNode
+from arraymanagement.nodes.hdfnodes import PandasHDFNode, PyTables
 from arraymanagement.nodes.sql import SimpleQueryTable
 
 global_config = dict(
     is_dataset = False,
     csv_options = {},
     datetime_type = 'datetime64[ns]',
-    loaders = {
-        '*.csv' : PandasCSVNode,
-        '*.CSV' : PandasCSVNode,
-        '*.hdf5' : PandasHDFNode,
-        '*.h5' : PandasHDFNode,
-        '*.sql' : SimpleQueryTable,
-        },
+    loaders = collections.OrderedDict([
+        ('*pytables/*.hdf5', PyTables),
+        ('*.csv' , PandasCSVNode),
+        ('*.CSV' , PandasCSVNode),
+        ('*.hdf5' , PandasHDFNode),
+        ('*.h5' , PandasHDFNode),
+        ('*.sql' , SimpleQueryTable),
+        ])
     )            
 
 import custom
