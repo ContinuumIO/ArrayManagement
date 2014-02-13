@@ -299,7 +299,7 @@ class PyTables(Node):
         self.localpath = localpath
         self.handle = tables.File(self.absolute_file_path)
         if self.localpath == "/":
-            children = [x._v_pathname for x in self.handle.list_nodes(self.localpath)]
+            children = [x._v_pathname for x in self.handle.listNodes(self.localpath)]
             if children == ['/__data__']:
                 self.localpath = "/__data__"
                 self.is_group = False
