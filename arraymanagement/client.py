@@ -16,11 +16,15 @@ logger = logging.getLogger(__name__)
 class ArrayClient(Node):
     #should modify this to inherit from DirectorNode
     is_group = True
-    def __init__(self, path, configname="datalib.config", group_write=True):
-        self.root = abspath(path)
+    def __init__(self, basepath, configname="datalib.config", group_write=True, localdatapath=None):
+        self.root = abspath(basepath)
         self.debug = True
         if self.root not in sys.path:
             sys.path.append(self.root)
+
+        if localdatapath:
+            sys.path.insert(0,localdatapath)
+
         try:
             self.raw_config = __import__(configname, fromlist=[''])
         except ImportError:
