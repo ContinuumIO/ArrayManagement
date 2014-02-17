@@ -26,6 +26,9 @@ from sqlalchemy.orm import sessionmaker
 logger = logging.getLogger(__name__)
 
 SEP = '+++'
+import sys
+from pdb import set_trace
+from collections import defaultdict
 
 class DumbParameterizedQueryTable(PandasCacheableTable):
     config_fields = ['query',
@@ -479,7 +482,8 @@ class MetaSqlCaching(BulkParameterizedQueryTable):
         return repr_data
 
 
-class FlexibleSqlCaching(BulkParameterizedQueryTable):
+
+class FlexibleSqlDateCaching(BulkParameterizedQueryTable):
     def init_from_file(self):
         with open(join(self.basepath, self.relpath)) as f:
             data = f.read()
@@ -491,7 +495,9 @@ class FlexibleSqlCaching(BulkParameterizedQueryTable):
             for f in fields:
                 setattr(self, f, column(f))
 
-    def select(self, query_filter, where=None):
+    def select(self, query_filter, where=None, **kwargs):
+        set_trace()
+        query_filter = and_(query_filter,column('date') >= kwargs['date_1'], column('date') <= kwargs['date_2'])
         cache_info = self.cache_info(query_filter)
         if cache_info is None:
             self.cache_data(query_filter)
@@ -508,112 +514,22 @@ class FlexibleSqlCaching(BulkParameterizedQueryTable):
         q = q % self.query
         query = self.session.query(q).filter(query_filter)
         return query
-
-    def get_hash_and_dates(self, query_filter):
-        set_trace()
-        params =  query_filter.compile().construct_params()
-        date_dict = {}
-        for k,v in params.iteritems():
-            if 'date' in k.lower():
-                date_dict[k]= v
-
-        #remove date time parameters
-        [params.pop(k) for k in date_dict.keys()]
-
-        hashval = gethashval((str(query_filter),params
-                              ))
-        return hashval,date_dict
-
-    def date_mm(self,date_dict):
-        """
-        find the max and min of dictionary of dates
-        dates come with _NUMBER suffix
-
-        NOTE: it's possible to search on multiple date columns
-        want to find biggest time delta
-        """
-
-        date_pairs = defaultdict(list)
-        for k,v in date_dict.iteritems():
-            date = k.split('_')[0]
-            date_pairs[date].append(v)
-
-        #find max of date_pairs:
-        #date_suffix,timedetla,max,min
-        max_date = [0,dt.timedelta(0),0,0]
-        for k,v in date_pairs.iteritems():
-            t_max = abs(v[0]-v[1])
-            if max_date[1] < t_max:
-                max_date[0] = k
-                max_date[1] = t_max
-                max_date[2] = max(v[0],v[1])
-                max_date[3] = min(v[0],v[1])
-
-        print max_date
-        return np.datetime64(max_date[2]), np.datetime64(max_date[3])
-
-
+    def gethashval(self, query_filter):
+        hashval = gethashval((str(query_filter),
+                              query_filter.compile().construct_params()))
+        return hashval
     def store_cache_spec(self, query_filter, start_row, end_row):
-        hashval, date_dict = self.get_hash_and_dates(query_filter)
-        print hashval, date_dict
-
-        d_max, d_min = self.date_mm(date_dict)
+        hashval = self.gethashval(query_filter)
         data = pd.DataFrame({'hashval' : [hashval],
                              '_start_row' : start_row,
-                             '_end_row' : end_row,
-                             'max_date': d_max,
-                             'min_date': d_min})
-
+                             '_end_row' : end_row})
         write_pandas(self.store, 'cache_spec', data, {}, 1.1,
                      replace=False)
 
     def cache_info(self, query_filter):
-        hashval, date_dict = self.get_hash_and_dates(query_filter)
-        print 'CACHING INFO'
-        print hashval
-        d_max, d_min = self.date_mm(date_dict)
+        hashval = self.gethashval(query_filter)
         try:
             result = self.store.select('cache_spec', where=[('hashval', hashval)])
-            max_date = self.store['cache_spec']['max_date'].values[0]
-            min_date = self.store['cache_spec']['min_date'].values[0]
-
-            print d_max, max_date
-            print d_min, min_date
-
-            #check earlier dates for requested maximum
-            if d_max <= max_date:
-                if d_max < min_date:
-                    #maxmimum date is further in time than current minimum
-                    d_max = d_max
-                else:
-                    #maximum date is in between current max and min
-                    #or equal or maximum
-                    #set to current minimum
-                    d_max = min_date
-
-            else:
-                d_max = d_max
-
-
-            #check later date for requested minimum
-            if d_min >= min_date:
-                if d_min > max_date:
-                    #minimum date is closer in time than current max
-                    d_min = d_min
-                else:
-                    #minimum date is between current min and max
-                    #or equal to minimum
-                    #set to current maximum
-                    d_min = max_date
-            else:
-                d_min = d_min
-
-            print 'AFTER LOGIC'
-            print d_max, max_date
-            print d_min, min_date
-            self.cache_data(query_filter)
-            cache_info = self.cache_info(query_filter)
-
         except KeyError:
             return None
         if result is None:
