@@ -4,6 +4,7 @@ from os.path import join, dirname, split, realpath, exists
 from os import makedirs
 import json
 from sqlalchemy.sql import and_, column
+import pandas as pd
 
 
 from arraymanagement.client import ArrayClient
@@ -127,11 +128,20 @@ def test_sql_new_cache():
 
 
     arr = client['/sqlviews/flex_view.fdsql']
-
+    store = arr.store
 
     print '\n\n\nFull Selection'
-    aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(2000,1,1), \
-                                date_2 = dt.datetime(2003,12,30))
+
+    date_1 = dt.datetime(2000,1,1)
+    date_2 = dt.datetime(2003,12,30)
+    aapl = arr.select(and_(arr.ticker=='AAPL'),date_1 = date_1 , date_2 = date_2)
+
+    max_date = store['/cache_spec']['end_date'].max()
+
+    assert aapl.date.max() == date_2
+    assert max_date == pd.Timestamp(date_2)
+
+
 
     print '\n\n\nFull Right'
     aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(2004,1,1), \
