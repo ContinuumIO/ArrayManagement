@@ -114,21 +114,46 @@ def test_sql_new_cache():
 
     #query 2012 data
     aapl = client['/sqlviews/bulkview.bsqlspec'].select(ticker='AAPL',
+
                                        date=[dt.datetime(2003,1,1),
                                              dt.datetime(2012,12,30)],
                                        )
 
 
     arr = client['/sqlviews/flex_view.fsql']
+
     aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(1998,1,1), \
-                                arr.date <= dt.datetime(2012,12,30)))
+                                arr.date <= dt.datetime(1998,12,30)))
 
 
     arr = client['/sqlviews/flex_view.fdsql']
 
 
-    aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(2003,1,1), \
-                                date_2 = dt.datetime(2012,12,30))
+    print '\n\n\nFull Selection'
+    aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(2000,1,1), \
+                                date_2 = dt.datetime(2003,12,30))
+
+    print '\n\n\nFull Right'
+    aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(2004,1,1), \
+                                date_2 = dt.datetime(2005,12,30))
+
+    print '\n\n\nShifted Right'
+    aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(2004,12,30), \
+                                date_2 = dt.datetime(2008,12,30))
+    print '\n\n\nInner Selection'
+    aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(2006,12,30), \
+                                date_2 = dt.datetime(2007,12,30))
+
+    print '\n\n\nShifted left'
+    aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(1999,10,30), \
+                                date_2 = dt.datetime(2006,4,30))
+
+    print '\n\n\nFull left'
+    aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(1999,1,1), \
+                                date_2 = dt.datetime(1999,6,30))
+    print '\n\n\nFull Outer'
+    aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(1998,1,05), \
+                                date_2 = dt.datetime(2013,8,9))
 
     # cache = join(basepath,'sqlviews','.cache','cache_flex_view.fdsql.hdf5')
 
