@@ -10,18 +10,39 @@ import sys
 import os
 import shutil
 from . import clear_mem_cache
+import logging
+logger = logging.getLogger(__name__)
 
 class ArrayClient(Node):
     #should modify this to inherit from DirectorNode
     is_group = True
-    def __init__(self, path, configname="datalib.config", group_write=True):
-        self.root = abspath(path)
+    def __init__(self, basepath, configname="datalib.config", group_write=True, localdatapath=None):
+        self.root = abspath(basepath)
         self.debug = True
         if self.root not in sys.path:
             sys.path.append(self.root)
-        self.raw_config = __import__(configname, fromlist=[''])
+
+        if localdatapath:
+            sys.path.insert(0,localdatapath)
+
+        try:
+            self.raw_config = __import__(configname, fromlist=[''])
+        except ImportError:
+            default_configname = "arraymanagement.defaultconfig"
+            logger.error("could not load config %s", configname)
+            logger.error("iporting default config %s instead", default_configname)
+            self.raw_config = __import__(default_configname, fromlist=[''])
+
         self.config = self.get_config()
-        context = NodeContext("/", self.root, self)
+
+        try:
+            cache_dir = self.config.config['cache_dir']
+            if '~' in cache_dir:
+                cache_dir = os.path.expanduser(cache_dir)
+        except:
+            cache_dir = self.root
+
+        context = NodeContext("/", self.root, self,cache_dir=cache_dir)
         if group_write:
             os.umask(2)
         super(ArrayClient, self).__init__(context)

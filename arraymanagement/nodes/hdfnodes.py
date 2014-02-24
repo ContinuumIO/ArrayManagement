@@ -167,7 +167,7 @@ class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
     def __init__(self, context, localpath="/"):
         super(PandasHDFNode, self).__init__(context)
         self.localpath = localpath
-        self.store = get_pandas_hdf5(self.absolute_file_path)
+        self.store = get_pandas_hdf5(self.cache_dir)
         # this will either point to a hdf group, or an hdf table... maybe this is bad idea
         # to do this all in one class but for now...
         if self.store.keys() == ['/__data__']:
@@ -216,7 +216,8 @@ class PandasCacheable(Node, HDFDataSetMixin):
 
     def cache_path(self):
         cache_name = "cache_%s.hdf5" % self.key
-        apath = self.absolute_file_path
+
+        apath = self.cache_dir
         if isfile(apath):
             cachedir = join(dirname(apath), '.cache')
         else:
@@ -264,7 +265,7 @@ class PandasCacheableFixed(PandasCacheable):
     """
     inmemory_cache = {}
     def cache_key(self):
-        return self.absolute_file_path, self.localpath
+        return self.cache_dir, self.localpath
     
     def load_data(self):
         data = self.get_data()
