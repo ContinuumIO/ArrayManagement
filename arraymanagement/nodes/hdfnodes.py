@@ -167,7 +167,11 @@ class PandasHDFNode(Node, HDFDataSetMixin, HDFDataGroupMixin):
     def __init__(self, context, localpath="/"):
         super(PandasHDFNode, self).__init__(context)
         self.localpath = localpath
-        self.store = get_pandas_hdf5(self.cache_dir)
+
+        try:
+            self.store = get_pandas_hdf5(self.cache_dir)
+        except IOError:
+            self.store = get_pandas_hdf5(self.absolute_file_path)
         # this will either point to a hdf group, or an hdf table... maybe this is bad idea
         # to do this all in one class but for now...
         if self.store.keys() == ['/__data__']:

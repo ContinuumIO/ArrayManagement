@@ -54,16 +54,20 @@ class NodeContext(object):
         return self.client
 
     def clone(self, **kwargs):
-        cache_dir = self.config.config['cache_dir']
+        try:
+            cache_dir = self.config.config['cache_dir']
 
-        if '~' in cache_dir:
-            cache_dir = os.path.expanduser(cache_dir)
+            if '~' in cache_dir:
+                cache_dir = os.path.expanduser(cache_dir)
+
+        except KeyError:
+            cache_dir = self.absolute_file_path
 
         args = {'urlpath' : self.urlpath, 
                 'absolute_file_path' : self.absolute_file_path,
                 'client' : self.client,
                 'parent_config' : self.config.config,
-                'cache_dir': cache_dir or '/'
+                'cache_dir': cache_dir
                 }
         args.update(kwargs)
         return self.__class__(args['urlpath'], 

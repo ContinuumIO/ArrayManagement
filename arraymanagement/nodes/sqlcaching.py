@@ -538,7 +538,7 @@ class FlexibleSqlDateCaching(BulkParameterizedQueryTable):
         hashval = self.gethashval(query_filter)
         try:
 
-            print self.store['/cache_spec']
+            # print self.store['/cache_spec']
 
             result = self.store.select('cache_spec', where=[('hashval', hashval),
                                                             ('start_date',start_date)])
@@ -657,7 +657,6 @@ class FlexibleSqlDateCaching(BulkParameterizedQueryTable):
             start_row = s[0]
             end_row = s[1]
 
-            print start_row,end_row
             temp = store.select(self.localpath,
                                            start=start_row, stop=end_row)
             temp.head()

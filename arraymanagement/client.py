@@ -39,7 +39,7 @@ class ArrayClient(Node):
             cache_dir = self.config.config['cache_dir']
             if '~' in cache_dir:
                 cache_dir = os.path.expanduser(cache_dir)
-        except:
+        except KeyError:
             cache_dir = self.root
 
         context = NodeContext("/", self.root, self,cache_dir=cache_dir)
