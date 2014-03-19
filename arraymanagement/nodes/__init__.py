@@ -9,7 +9,7 @@ from ..exceptions import ArrayManagementException
 logger = logging.getLogger(__name__)
 
 class NodeContext(object):
-    def __init__(self, urlpath, absolute_file_path, client, 
+    def __init__(self, urlpath, absolute_file_path, client,cache_dir,
                  parent_config=None):
 
         """    
@@ -22,6 +22,7 @@ class NodeContext(object):
         self.absolute_file_path = absolute_file_path
         self.client = client
         self.key = posixpath.basename(urlpath)
+        self.cache_dir = cache_dir or '/'
         self.config = self.client.get_config(urlpath=self.urlpath, 
                                              parent_config=parent_config)
                 
@@ -53,16 +54,27 @@ class NodeContext(object):
         return self.client
 
     def clone(self, **kwargs):
+        try:
+            cache_dir = self.config.config['cache_dir']
+
+            if '~' in cache_dir:
+                cache_dir = os.path.expanduser(cache_dir)
+
+        except KeyError:
+            cache_dir = self.absolute_file_path
+
         args = {'urlpath' : self.urlpath, 
                 'absolute_file_path' : self.absolute_file_path,
                 'client' : self.client,
-                'parent_config' : self.config.config
+                'parent_config' : self.config.config,
+                'cache_dir': cache_dir
                 }
         args.update(kwargs)
         return self.__class__(args['urlpath'], 
                               args['absolute_file_path'],
                               args['client'],
-                              parent_config=args['parent_config']
+                              args['cache_dir'],
+                              parent_config=args['parent_config'],
                               )
         
 display_limit=100
@@ -75,6 +87,7 @@ class Node(object):
         self.basepath = context.basepath
         self.config = context.config
         self.absolute_file_path = context.absolute_file_path
+        self.cache_dir = context.cache_dir
         self.key = context.key
         self.context = context
         for field in self.config_fields:
