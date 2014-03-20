@@ -3,7 +3,8 @@ import datetime as dt
 from os.path import join, dirname, split, realpath, exists
 from os import makedirs
 import json
-from sqlalchemy.sql import and_
+from sqlalchemy.sql import and_, column
+import pandas as pd
 
 
 from arraymanagement.client import ArrayClient
@@ -57,96 +58,152 @@ def test_csv_node():
     data3 = node.select()
     #better check later
 
-def test_sql_node():
+def test_sql_yaml_cache():
     basepath = join(dirname(dirname(__file__)), 'example')
     client = ArrayClient(basepath)
-    aapl = client['/sqlviews/AAPL'].select()
-    assert aapl.shape == (3925,3)
-    
-def test_sql_cache():
-    basepath = join(dirname(dirname(__file__)), 'example')
-    client = ArrayClient(basepath)
-    #query 2012 data
-    aapl = client['/sqlviews/view'].select(ticker='AAPL',
-                                           date=[dt.datetime(2012,1,1), 
-                                                 dt.datetime(2012,12,30)],
-                                           where=[]
-                                           )
-    assert aapl.date.max() == dt.datetime(2012, 12, 28)
-    assert aapl.shape == (249,  3)
-    assert client['/sqlviews/view'].table.nrows == 249
 
-    #query 2012 data, make sure we didn't add more data to hdf5
-    aapl = client['/sqlviews/view'].select(ticker='AAPL',
-                                           date=[dt.datetime(2012,1,1), 
-                                                 dt.datetime(2012,12,30)],
-                                           where=[]
-                                           )
-    assert aapl.date.max() == dt.datetime(2012, 12, 28)    
-    assert client['/sqlviews/view'].table.nrows == 249
+    arr = client['/sqlviews/example_sql.yaml']
 
-    #query 2013 data, make sure we DID add more data to hdf5
-    aapl = client['/sqlviews/view'].select(ticker='AAPL',
-                                           date=[dt.datetime(2013,1,1), 
-                                                 dt.datetime(2013,12,30)],
-                                           where=[]
-                                           )
-    assert aapl.date.max() == dt.datetime(2013, 8, 9)
-    #query 2012 data, make sure it still works
-    aapl = client['/sqlviews/view'].select(ticker='AAPL',
-                                           date=[dt.datetime(2012,1,1), 
-                                                 dt.datetime(2012,12,30)],
-                                           where=[]
-                                           )
-    assert aapl.date.max() == dt.datetime(2012, 12, 28)
-    
-    #try a query with a where clause
-    aapl = client['/sqlviews/view'].select(ticker='AAPL',
-                                           date=[dt.datetime(2013,1,1), 
-                                                 dt.datetime(2013,12,30)],
-                                           where=[('c', '==', 513.985)]
-                                           )
-    assert aapl.shape == (1,3) and aapl.c.iloc[0] == 513.985
+    date_1 = dt.datetime(2000,1,1)
+    date_2 = dt.datetime(2003,12,30)
+    aapl = arr.select(and_(arr.ticker=='AAPL'),date_1 = date_1 , date_2 = date_2)
 
-def test_sql_new_cache():
-    basepath = join(dirname(dirname(__file__)), 'example')
-    client = ArrayClient(basepath)
-    #query 2012 data
-    aapl = client['/sqlviews/bulkview.bsqlspec'].select(ticker='AAPL',
-                                       date=[dt.datetime(2003,1,1),
-                                             dt.datetime(2012,12,30)],
-                                       )
-    arr = client['/sqlviews/flex_view.fsql']
-    aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(2003,1,1), \
-                                arr.date <= dt.datetime(2012,12,30)))
-    cache = join(basepath,'sqlviews','.cache','cache_flex_view.fsql.hdf5')
+    arr = client['/sqlviews/example_no_dates.yaml']
+    aapl = arr.select(and_(arr.ticker.in_(['A','AA'])))
+    print aapl
 
-    #minimum shifted left
-    aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(1998,1,1), \
-                                arr.date <= dt.datetime(2012,12,30)))
-
-    #minimum and maximum shifted left
-    aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(1998,1,1), \
-                                arr.date <= dt.datetime(2001,12,30)))
-
-    #maximum shifted right
-    aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(2003,1,1), \
-                                arr.date <= dt.datetime(2013,12,30)))
-
-    #maximum and minimum shifted right
-    aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(2013,1,1), \
-                                arr.date <= dt.datetime(2013,12,30)))
-
-    #inner call
-    aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(2004,1,1), \
-                                arr.date <= dt.datetime(2009,12,30)))
-
-    print aapl.head()
+    arr = client['/sqlviews/example_no_dates_not_entities.yaml']
+    aapl = arr.select(query_filter=None)
+    print aapl
 
 
-def test_pytables_access():
-    basepath = join(dirname(dirname(__file__)), 'example')
-    client = ArrayClient(basepath)
-    assert client["/pytables/array.hdf5/firstgroup"].keys() == []
-    assert client["/pytables/array.hdf5/random_numbers"].node[:].shape == (300,200,100)
-
+# def test_sql_node():
+#     basepath = join(dirname(dirname(__file__)), 'example')
+#     client = ArrayClient(basepath)
+#     aapl = client['/sqlviews/AAPL'].select()
+#     assert aapl.shape == (3925,3)
+#
+# def test_sql_cache():
+#     basepath = join(dirname(dirname(__file__)), 'example')
+#     client = ArrayClient(basepath)
+#     #query 2012 data
+#     aapl = client['/sqlviews/view'].select(ticker='AAPL',
+#                                            date=[dt.datetime(2012,1,1),
+#                                                  dt.datetime(2012,12,30)],
+#                                            where=[]
+#                                            )
+#     assert aapl.date.max() == dt.datetime(2012, 12, 28)
+#     assert aapl.shape == (249,  3)
+#     assert client['/sqlviews/view'].table.nrows == 249
+#
+#     #query 2012 data, make sure we didn't add more data to hdf5
+#     aapl = client['/sqlviews/view'].select(ticker='AAPL',
+#                                            date=[dt.datetime(2012,1,1),
+#                                                  dt.datetime(2012,12,30)],
+#                                            where=[]
+#                                            )
+#     assert aapl.date.max() == dt.datetime(2012, 12, 28)
+#     assert client['/sqlviews/view'].table.nrows == 249
+#
+#     #query 2013 data, make sure we DID add more data to hdf5
+#     aapl = client['/sqlviews/view'].select(ticker='AAPL',
+#                                            date=[dt.datetime(2013,1,1),
+#                                                  dt.datetime(2013,12,30)],
+#                                            where=[]
+#                                            )
+#     assert aapl.date.max() == dt.datetime(2013, 8, 9)
+#     #query 2012 data, make sure it still works
+#     aapl = client['/sqlviews/view'].select(ticker='AAPL',
+#                                            date=[dt.datetime(2012,1,1),
+#                                                  dt.datetime(2012,12,30)],
+#                                            where=[]
+#                                            )
+#     assert aapl.date.max() == dt.datetime(2012, 12, 28)
+#
+#     #try a query with a where clause
+#     aapl = client['/sqlviews/view'].select(ticker='AAPL',
+#                                            date=[dt.datetime(2013,1,1),
+#                                                  dt.datetime(2013,12,30)],
+#                                            where=[('c', '==', 513.985)]
+#                                            )
+#     assert aapl.shape == (1,3) and aapl.c.iloc[0] == 513.985
+#
+# def test_sql_new_cache():
+#     basepath = join(dirname(dirname(__file__)), 'example')
+#     client = ArrayClient(basepath)
+#
+#     #query 2012 data
+#     aapl = client['/sqlviews/bulkview.bsqlspec'].select(ticker='AAPL',
+#
+#                                        date=[dt.datetime(2003,1,1),
+#                                              dt.datetime(2012,12,30)],
+#                                        )
+#
+#
+#     arr = client['/sqlviews/flex_view.fsql']
+#
+#     aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(1998,1,1), \
+#                                 arr.date <= dt.datetime(1998,12,30)))
+#
+#
+#     arr = client['/sqlviews/flex_view.fdsql']
+#     store = arr.store
+#
+#     print '\n\n\nFull Selection'
+#
+#     date_1 = dt.datetime(2000,1,1)
+#     date_2 = dt.datetime(2003,12,30)
+#     aapl = arr.select(and_(arr.ticker=='AAPL'),date_1 = date_1 , date_2 = date_2)
+#
+#     max_date = store['/cache_spec']['end_date'].max()
+#
+#     assert aapl.date.max() == date_2
+#     assert max_date == pd.Timestamp(date_2)
+#
+#
+#
+#     print '\n\n\nFull Right'
+#     aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(2004,1,1), \
+#                                 date_2 = dt.datetime(2005,12,30))
+#
+#     print '\n\n\nShifted Right'
+#     aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(2004,12,30), \
+#                                 date_2 = dt.datetime(2008,12,30))
+#     print '\n\n\nInner Selection'
+#     aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(2006,12,30), \
+#                                 date_2 = dt.datetime(2007,12,30))
+#
+#     print '\n\n\nShifted left'
+#     aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(1999,10,30), \
+#                                 date_2 = dt.datetime(2006,4,30))
+#
+#     print '\n\n\nFull left'
+#     aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(1999,1,1), \
+#                                 date_2 = dt.datetime(1999,6,30))
+#     print '\n\n\nFull Outer'
+#     aapl = arr.select(and_(arr.ticker=='AAPL'), date_1 = dt.datetime(1998,1,05), \
+#                                 date_2 = dt.datetime(2013,8,9))
+#
+#     # cache = join(basepath,'sqlviews','.cache','cache_flex_view.fdsql.hdf5')
+#
+#     # #minimum shifted left
+#     # aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(1998,1,1), \
+#     #                             arr.date <= dt.datetime(2012,12,30)))
+#     #
+#     # #minimum and maximum shifted left
+#     # aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(1998,1,1), \
+#     #                             arr.date <= dt.datetime(2001,12,30)))
+#     #
+#     # #maximum shifted right
+#     # aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(2003,1,1), \
+#     #                             arr.date <= dt.datetime(2013,12,30)))
+#     #
+#     # #maximum and minimum shifted right
+#     # aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(2013,1,1), \
+#     #                             arr.date <= dt.datetime(2013,12,30)))
+#     #
+#     # #inner call
+#     # aapl = arr.select(and_(arr.ticker=='AAPL',arr.date >= dt.datetime(2004,1,1), \
+#     #                             arr.date <= dt.datetime(2009,12,30)))
+#
+#     print aapl.head()
