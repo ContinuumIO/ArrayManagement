@@ -25,7 +25,8 @@ from sqlalchemy.orm import sessionmaker
 
 logger = logging.getLogger(__name__)
 
-SEP = '+++'
+import yaml
+
 import sys
 from pdb import set_trace
 from collections import defaultdict
@@ -338,19 +339,23 @@ class BulkParameterizedQueryTable(DumbParameterizedQueryTable):
             return None
         else:
             return result['_start_row'], result['_end_row']
-        
+
 class FlexibleSqlCaching(BulkParameterizedQueryTable):
+    def __init__(self,other_params):
+        self.__dict__.update(other_params.__dict__)
+
     def init_from_file(self):
         with open(join(self.basepath, self.relpath)) as f:
-            data = f.read()
-            query, fields = data.split(SEP)
+            data = yaml.load(f)
+            assert len(data['SQL'].keys()) == 1
+            key = data['SQL'].keys()[0]
+            query = data['SQL'][key]['query']
+            fields = data['SQL'][key]['conditionals']
+
             self.query = query
-            fields = [x.strip() for x in fields.split(",") \
-                          if x.strip()]
             self.fields = fields
-            for f in fields:
-                setattr(self, f, column(f))
-                
+
+
     def select(self, query_filter, where=None):
         cache_info = self.cache_info(query_filter)
         if cache_info is None:
@@ -366,95 +371,21 @@ class FlexibleSqlCaching(BulkParameterizedQueryTable):
     def cache_query(self, query_filter):
         q = """ * from (%s) as X """
         q = q % self.query
-        query = self.session.query(q).filter(query_filter)
-        return query
-    def gethashval(self, query_filter):
-        hashval = gethashval((str(query_filter), 
-                              query_filter.compile().construct_params()))
-        return hashval
-    def store_cache_spec(self, query_filter, start_row, end_row):
-        hashval = self.gethashval(query_filter)
-        data = pd.DataFrame({'hashval' : [hashval], 
-                             '_start_row' : start_row,
-                             '_end_row' : end_row})
-        write_pandas(self.store, 'cache_spec', data, {}, 1.1,
-                     replace=False)
-        
-    def cache_info(self, query_filter):
-        hashval = self.gethashval(query_filter)
-        try:
-            result = self.store.select('cache_spec', where=[('hashval', hashval)])
-        except KeyError:
-            return None
-        if result is None:
-            return None
-        if result.shape[0] == 0:
-            return None
+        if not hasattr(query_filter,'compile'):
+            query = self.session.query(q)
         else:
-            return result['_start_row'], result['_end_row']
-    def repr_data(self):
-        repr_data = super(DumbParameterizedQueryTable, self).repr_data()
-        repr_data.append("query: %s" % self.query)
-        repr_data.append("fields: %s" % self.fields)
-        return repr_data
-
-
-class MetaSqlCaching(BulkParameterizedQueryTable):
-    def __init__(self, *args, **kwargs):
-        super(BulkParameterizedQueryTable, self).__init__(*args, **kwargs)
-        if self.query is None:
-            self.init_from_file()
-        self.engine = create_engine(*self.sqlalchemy_args,
-                                    **self.sqlalchemy_kwargs)
-        self.session = sessionmaker(bind=self.engine)()
-        self._build_enums()
-
-    def init_from_file(self):
-        with open(join(self.basepath, self.relpath)) as f:
-            data = f.read()
-            query, meta = data.split(SEP)
-            self.query = query
-            self.meta = json.loads(meta)
-
-    def _build_enums(self):
-        if self.meta.has_key('enum_params'):
-            for k in self.meta['enum_params'].keys():
-                v = self.meta['enum_params'][k]
-                if isinstance(v, unicode):
-                    pass
-                    df = self._execute_query_df(v)
-                    setattr(self,k,df)
-                if isinstance(v, list):
-                    setattr(self,k,v)
-
-    def _execute_query_df(self, query=None):
-        #this should really be cached like everything else
-        if query is None:
-            query = self.query
-        results = self.session.execute(query).fetchall()
-        return pd.DataFrame.from_records(results)
-
-    def select(self, query_filter, where=None):
-        cache_info = self.cache_info(query_filter)
-        if cache_info is None:
-            self.cache_data(query_filter)
-            cache_info = self.cache_info(query_filter)
-        start_row, end_row = cache_info
-        if not where:
-            where = None
-        result = self.store.select(self.localpath, where=where,
-                                   start=start_row, stop=end_row)
-        return result
-
-    def cache_query(self, query_filter):
-        q = """ * from (%s) as X """
-        q = q % self.query
-        query = self.session.query(q).filter(query_filter)
+            query = self.session.query(q).filter(query_filter)
         return query
+
     def gethashval(self, query_filter):
-        hashval = gethashval((str(query_filter),
+
+        if not hasattr(query_filter,'compile'):
+            hashval = gethashval(('',''))
+        else:
+            hashval = gethashval((str(query_filter),
                               query_filter.compile().construct_params()))
         return hashval
+
     def store_cache_spec(self, query_filter, start_row, end_row):
         hashval = self.gethashval(query_filter)
         data = pd.DataFrame({'hashval' : [hashval],
@@ -478,39 +409,47 @@ class MetaSqlCaching(BulkParameterizedQueryTable):
     def repr_data(self):
         repr_data = super(DumbParameterizedQueryTable, self).repr_data()
         repr_data.append("query: %s" % self.query)
-        repr_data.append("meta: %s" % self.meta)
+        repr_data.append("fields: %s" % self.fields)
         return repr_data
 
 
-
-class FlexibleSqlDateCaching(BulkParameterizedQueryTable):
+class YamlSqlDateCaching(BulkParameterizedQueryTable):
     def init_from_file(self):
         with open(join(self.basepath, self.relpath)) as f:
-            data = f.read()
-            query, fields = data.split(SEP)
+            data = yaml.load(f)
+            assert len(data['SQL'].keys()) == 1
+            key = data['SQL'].keys()[0]
+            query = data['SQL'][key]['query']
+            fields = data['SQL'][key]['conditionals']
+
             self.query = query
-            fields = [x.strip() for x in fields.split(",") \
-                          if x.strip()]
             self.fields = fields
-            for f in fields:
-                setattr(self, f, column(f))
+
+            #no conditionals defined
+            if fields is not None:
+                for f in fields:
+                    setattr(self, f, column(f))
 
     def select(self, query_filter, where=None, **kwargs):
-        # set_trace()
-        start_date, end_date = kwargs['date_1'], kwargs['date_2']
+        if 'date_1' not in kwargs.keys():
+            #no dates in query
 
-        result = self.cache_info(query_filter,start_date, end_date)
+            fs = FlexibleSqlCaching(self)
+            fs.localpath = self.localpath
+            fs.urlpath = self.urlpath
+            fs.store = self.store
+            print 'query filter ', query_filter
+            result = fs.select(query_filter)
+            return result
 
-        if result is None:
-            self.cache_data(query_filter, start_date, end_date)
+        else:
+            start_date, end_date = kwargs['date_1'], kwargs['date_2']
+
             result = self.cache_info(query_filter,start_date, end_date)
 
-
-        # start_row, end_row = cache_info
-        # if not where:
-        #     where = None
-        # result = self.store.select(self.localpath, where=where,
-        #                            start=start_row, stop=end_row)
+            if result is None:
+                self.cache_data(query_filter, start_date, end_date)
+                result = self.cache_info(query_filter,start_date, end_date)
 
         return result
 

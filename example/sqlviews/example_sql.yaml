@@ -1,0 +1,15 @@
+SQL:
+    # Query for EOD data for list of entities
+    eod_stock:
+        type: 'conditional'
+        conditionals:
+            - date
+            - ticker
+
+        query: >
+            SELECT stocks.ticker,
+                    stock_hist.c,
+                    stock_hist.date
+            FROM stocks
+            JOIN stock_hist
+            on  stocks.sec_id = stock_hist.sec_id

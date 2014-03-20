@@ -1,11 +1,7 @@
 import arraymanagement.nodes.sql
 reload(arraymanagement.nodes.sql)
 from arraymanagement.nodes.sql import SimpleQueryTable
-from arraymanagement.nodes.sqlcaching import (DumbParameterizedQueryTable,
-                                              BulkParameterizedQueryTable,
-                                              FlexibleSqlCaching,
-                                              FlexibleSqlDateCaching,
-                                              MetaSqlCaching
+from arraymanagement.nodes.sqlcaching import (YamlSqlDateCaching,
                                               )
 import collections
 import sys
@@ -13,11 +9,7 @@ from os.path import dirname, join, abspath
 import sqlite3
 db_file = abspath(join(dirname(__file__), "data.db"))
 loaders = collections.OrderedDict([
-        ("*.sql" , SimpleQueryTable),
-        ("*.sqlspec", DumbParameterizedQueryTable),
-        ("*.bsqlspec", BulkParameterizedQueryTable),
-        ("*.fsql", FlexibleSqlCaching),
-        ("*.fdsql", FlexibleSqlDateCaching),
+        ("*.yaml", YamlSqlDateCaching),
         ])
 config = {
     'loaders' : loaders,
