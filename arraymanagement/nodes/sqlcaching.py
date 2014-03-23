@@ -418,9 +418,13 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
         with open(join(self.basepath, self.relpath)) as f:
             data = yaml.load(f)
             assert len(data['SQL'].keys()) == 1
+
             key = data['SQL'].keys()[0]
             query = data['SQL'][key]['query']
-            fields = data['SQL'][key]['conditionals']
+            if 'conditionals' in data['SQL'][key].keys():
+                fields = data['SQL'][key]['conditionals']
+            else:
+                fields = None
 
             self.query = query
             self.fields = fields
@@ -428,7 +432,8 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
             #no conditionals defined
             if fields is not None:
                 for f in fields:
-                    setattr(self, f, column(f))
+                    name = f.lower()
+                    setattr(self, name, column(name))
 
     def select(self, query_filter, where=None, **kwargs):
         if 'date_1' not in kwargs.keys():
@@ -438,7 +443,6 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
             fs.localpath = self.localpath
             fs.urlpath = self.urlpath
             fs.store = self.store
-            print 'query filter ', query_filter
             result = fs.select(query_filter)
             return result
 
@@ -531,7 +535,13 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
         return repr_data
 
     def cache_data(self, query_params, start_date, end_date):
-        all_query = and_(query_params,column('date') >=start_date, column('date') <= end_date)
+
+        for f in self.fields:
+            if 'date' in f:
+                col_date = f
+                break;
+
+        all_query = and_(query_params,column(col_date) >=start_date, column(col_date) <= end_date)
 
         q = self.cache_query(all_query)
         print str(q)
