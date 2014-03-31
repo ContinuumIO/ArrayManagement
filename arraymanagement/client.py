@@ -10,8 +10,7 @@ import sys
 import os
 import shutil
 from . import clear_mem_cache
-import logging
-logger = logging.getLogger(__name__)
+from arraymanagement.logger import log
 
 class ArrayClient(Node):
     #should modify this to inherit from DirectorNode
@@ -78,6 +77,14 @@ class ArrayClient(Node):
     
     def clear_mem_cache(self):
         clear_mem_cache()
+
+    def set_logging(self,external_log):
+        '''
+        setup external logger
+        '''
+
+        for l in external_log.handlers:
+            log.addHandler(l)
 
     def clear_disk_cache(self, url=None):
         if url is None:

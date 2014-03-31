@@ -5,7 +5,6 @@ from os.path import join, relpath
 import pandas as pd
 from pandas.io import sql
 import json
-import logging
 import itertools
 import cPickle as pickle
 import hashlib
@@ -23,7 +22,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
-logger = logging.getLogger(__name__)
+from arraymanagement.logger import log
 
 import yaml
 
@@ -99,7 +98,8 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
             return
         min_itemsize = self.query_min_itemsize()
         if min_itemsize is not None and min_itemsize['finalized']:
-            logger.debug("will not set min_itemsize, already finalized")
+            pass
+            # log.debug("will not set min_itemsize, already finalized")
         else:
             if 'finalized' not in val:
                 val['finalized'] = False
@@ -185,7 +185,9 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
     
     def cache_data(self, query_params):
         q = self.cache_query(query_params)
-        print str(q)
+        log.debug(str(q))
+
+
         cur = self.session.execute(q)
         
         min_itemsize = self.min_itemsize if self.min_itemsize else {}
@@ -544,7 +546,8 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
         all_query = and_(query_params,column(col_date) >=start_date, column(col_date) <= end_date)
 
         q = self.cache_query(all_query)
-        print str(q)
+        log.debug(str(q))
+
         cur = self.session.execute(q)
 
         min_itemsize = self.min_itemsize if self.min_itemsize else {}
