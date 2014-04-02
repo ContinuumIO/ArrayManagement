@@ -9,54 +9,54 @@ import pandas as pd
 
 from arraymanagement.client import ArrayClient
 
-def setup_module():
-    basepath = join(dirname(dirname(__file__)), 'example')
-    client = ArrayClient(basepath)
-    client.clear_disk_cache()
-
-def teardown_module():
-    basepath = join(dirname(dirname(__file__)), 'example')
-    client = ArrayClient(basepath)
-    client.clear_disk_cache()
-
-def test_csv_node():
-    basepath = join(dirname(dirname(__file__)), 'example')
-    client = ArrayClient(basepath)
-    node = client.get_node('/csvs/sample')
-    data = node.get()
-    #better check later
-    assert data.shape == (73,2)
-
-def test_hdf_node():
-    basepath = join(dirname(dirname(__file__)), 'example')
-    client = ArrayClient(basepath)
-    node = client.get_node('/pandashdf5/data')
-    assert 'sample' in node.keys()
-    node = node.get_node('sample')
-    data = node.select()
-    assert data.shape == (73,2)
-
-def test_custom_node():
-    basepath = join(dirname(dirname(__file__)), 'example')
-    client = ArrayClient(basepath)
-    node = client.get_node('/custom/sample2')
-    data1 = node.select()
-    node = client.get_node('/custom/sample')
-    data2 = node.get()
-    assert data2.iloc[2]['values'] == 2
-    assert data1.iloc[2]['values'] == 4
-
-
-def test_csv_node():
-    basepath = join(dirname(dirname(__file__)), 'example')
-    client = ArrayClient(basepath)
-    node = client.get_node('/customcsvs/sample')
-    data1 = node.get()
-    node = client.get_node('/customcsvs/sample2')
-    data2 = node.select()
-    node = client.get_node('/customcsvs/sample_pipe')
-    data3 = node.select()
-    #better check later
+# def setup_module():
+#     basepath = join(dirname(dirname(__file__)), 'example')
+#     client = ArrayClient(basepath)
+#     client.clear_disk_cache()
+#
+# def teardown_module():
+#     basepath = join(dirname(dirname(__file__)), 'example')
+#     client = ArrayClient(basepath)
+#     client.clear_disk_cache()
+#
+# def test_csv_node():
+#     basepath = join(dirname(dirname(__file__)), 'example')
+#     client = ArrayClient(basepath)
+#     node = client.get_node('/csvs/sample')
+#     data = node.get()
+#     #better check later
+#     assert data.shape == (73,2)
+#
+# def test_hdf_node():
+#     basepath = join(dirname(dirname(__file__)), 'example')
+#     client = ArrayClient(basepath)
+#     node = client.get_node('/pandashdf5/data')
+#     assert 'sample' in node.keys()
+#     node = node.get_node('sample')
+#     data = node.select()
+#     assert data.shape == (73,2)
+#
+# def test_custom_node():
+#     basepath = join(dirname(dirname(__file__)), 'example')
+#     client = ArrayClient(basepath)
+#     node = client.get_node('/custom/sample2')
+#     data1 = node.select()
+#     node = client.get_node('/custom/sample')
+#     data2 = node.get()
+#     assert data2.iloc[2]['values'] == 2
+#     assert data1.iloc[2]['values'] == 4
+#
+#
+# def test_csv_node():
+#     basepath = join(dirname(dirname(__file__)), 'example')
+#     client = ArrayClient(basepath)
+#     node = client.get_node('/customcsvs/sample')
+#     data1 = node.get()
+#     node = client.get_node('/customcsvs/sample2')
+#     data2 = node.select()
+#     node = client.get_node('/customcsvs/sample_pipe')
+#     data3 = node.select()
+#     #better check later
 
 def test_sql_yaml_cache():
     basepath = join(dirname(dirname(__file__)), 'example')
@@ -68,6 +68,13 @@ def test_sql_yaml_cache():
     date_2 = dt.datetime(2003,12,30)
     aapl = arr.select(and_(arr.ticker=='AAPL'),date_1 = date_1 , date_2 = date_2)
 
+    query = arr.select(and_(arr.ticker=='AAPL'),date_1 = date_1 , date_2 = date_2, IgnoreCache=True)
+    print query
+
+    query = arr.select(and_(arr.ticker=='AAPL'), IgnoreCache=True)
+    print '2nd query: ', query
+
+
     arr = client['/sqlviews/example_no_dates.yaml']
     aapl = arr.select(and_(arr.ticker.in_(['A','AA'])))
     print aapl
@@ -75,6 +82,11 @@ def test_sql_yaml_cache():
     arr = client['/sqlviews/example_no_dates_not_entities.yaml']
     aapl = arr.select(query_filter=None)
     print aapl
+
+    query = arr.select(query_filter=None, IgnoreCache=True)
+    print '3nd query: ', query
+
+
 
 
 # def test_sql_node():

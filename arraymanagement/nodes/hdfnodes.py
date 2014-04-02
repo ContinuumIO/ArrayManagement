@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 ## for here, we use pandas conventions, and the group mixin is used for real groups, whereas groups
 ## that are used only to contain a pandas object are treated as datasets
 
+#suppress pytables warnings
+import warnings
+warnings.filterwarnings('ignore',category=pd.io.pytables.PerformanceWarning)
+
+
 class HDFDataGroupMixin(object):
     def put(self, key, *args, **kwargs):
         new_local_path = join(self.localpath, key)

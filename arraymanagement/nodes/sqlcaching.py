@@ -25,10 +25,15 @@ from sqlalchemy.orm import sessionmaker
 from arraymanagement.logger import log
 
 import yaml
-
+import tables
 import sys
 from pdb import set_trace
 from collections import defaultdict
+
+#suppress pytables warnings
+import warnings
+warnings.filterwarnings('ignore',category=pd.io.pytables.PerformanceWarning)
+warnings.filterwarnings('ignore',category=tables.NaturalNameWarning)
 
 class DumbParameterizedQueryTable(PandasCacheableTable):
     config_fields = ['query',
@@ -185,7 +190,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
     
     def cache_data(self, query_params):
         q = self.cache_query(query_params)
-        log.debug(str(q))
+        log.debug(st(q))
 
 
         cur = self.session.execute(q)
@@ -438,7 +443,14 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
                     setattr(self, name, column(name))
 
     def select(self, query_filter, where=None, **kwargs):
-        if 'date_1' not in kwargs.keys():
+
+        ignore_cache = kwargs.get('IgnoreCache',None)
+        if ignore_cache:
+            query = self.compiled_query(query_filter,kwargs)
+            return query
+
+
+        if 'date' not in kwargs.keys():
             #no dates in query
 
             fs = FlexibleSqlCaching(self)
@@ -449,7 +461,10 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
             return result
 
         else:
-            start_date, end_date = kwargs['date_1'], kwargs['date_2']
+            dateKeys = [k for k in kwargs.keys() if 'date' in k]
+            dateKeys = sorted(dateKeys)
+            start_date, end_date = kwargs[dateKeys[0]], kwargs[dateKeys[1]]
+
 
             result = self.cache_info(query_filter,start_date, end_date)
 
@@ -654,3 +669,25 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
         self.cache_data(query_filter, start_date, min_date)
 
         return self.munge_tables(hashval, start_date, end_date)
+
+    def compiled_query(self,query_params,kwargs):
+        if 'date' not in kwargs.keys():
+            all_query = and_(query_params)
+            result = self.cache_query(all_query)
+            return str(result)
+
+        else:
+            dateKeys = [k for k in kwargs.keys() if 'date' in k]
+            dateKeys = sorted(dateKeys)
+            start_date, end_date = kwargs[dateKeys[0]], kwargs[dateKeys[1]]
+
+            for f in self.fields:
+                if 'date' in f:
+                    col_date = f
+                    break;
+
+            all_query = and_(query_params,column(col_date) >=start_date, column(col_date) <= end_date)
+
+            result = self.cache_query(all_query)
+
+            return str(result)
