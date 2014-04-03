@@ -69,11 +69,8 @@ def test_sql_yaml_cache():
     aapl = arr.select(and_(arr.ticker=='AAPL'),date_1 = date_1 , date_2 = date_2)
 
     query = arr.select(and_(arr.ticker=='AAPL'),date_1 = date_1 , date_2 = date_2, IgnoreCache=True)
-    print query
 
     query = arr.select(and_(arr.ticker=='AAPL'), IgnoreCache=True)
-    print '2nd query: ', query
-
 
     arr = client['/sqlviews/example_no_dates.yaml']
     aapl = arr.select(and_(arr.ticker.in_(['A','AA'])))
@@ -84,7 +81,6 @@ def test_sql_yaml_cache():
     print aapl
 
     query = arr.select(query_filter=None, IgnoreCache=True)
-    print '3nd query: ', query
 
 
 

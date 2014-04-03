@@ -190,7 +190,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
     
     def cache_data(self, query_params):
         q = self.cache_query(query_params)
-        log.debug(st(q))
+        log.debug(str(q))
 
 
         cur = self.session.execute(q)
