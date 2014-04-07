@@ -13,7 +13,7 @@ from arraymanagement.nodes.hdfnodes import (PandasCacheableTable,
                                             write_pandas,
                                             override_hdf_types,
                                             )
-from arraymanagement.nodes.hdfnodes import Node
+from arraymanagement.nodes.hdfnodes import Node, store_select
 from arraymanagement.nodes.sql import query_info
 
 from sqlalchemy.sql.expression import bindparam, tuple_
@@ -83,7 +83,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
 
     def query_min_itemsize(self):
         try:
-            min_itemsize = self.store.select('min_itemsize')
+            min_itemsize = store_select(self.store, 'min_itemsize')
         except KeyError:
             return None
         return min_itemsize.to_dict()
@@ -151,7 +151,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         param_dict = self.parameter_dict(query_params)
         query = param_dict.items()
         try:
-            result = self.store.select('cache_spec', where=query)
+            result = store_select(self.store, 'cache_spec', where=query)
         except KeyError:
             return None
         if result is None:
@@ -274,8 +274,8 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         start_row, end_row = cache_info
         if not where:
             where = None
-        result = self.store.select(self.localpath, where=where,
-                                   start=start_row, stop=end_row)
+        result = store_select(self.store, self.localpath, 
+                              where=where, start=start_row, stop=end_row)
         return result
     def repr_data(self):
         repr_data = super(DumbParameterizedQueryTable, self).repr_data()
@@ -310,8 +310,8 @@ class BulkParameterizedQueryTable(DumbParameterizedQueryTable):
         start_row, end_row = cache_info
         if not where:
             where = None
-        result = self.store.select(self.localpath, where=where,
-                                   start=start_row, stop=end_row)
+        result = store_select(self.store, self.localpath, 
+                              where=where, start=start_row, stop=end_row)
         return result
 
     def filter_sql(self, **kwargs):
@@ -337,7 +337,8 @@ class BulkParameterizedQueryTable(DumbParameterizedQueryTable):
         data = self.parameter_dict(query_params)
         hashval = gethashval(data)
         try:
-            result = self.store.select('cache_spec', where=[('hashval', hashval)])
+            result = store_select(self.store, 'cache_spec', 
+                                  where=[('hashval', hashval)])
         except KeyError:
             return None
         if result is None:
@@ -371,8 +372,9 @@ class FlexibleSqlCaching(BulkParameterizedQueryTable):
         start_row, end_row = cache_info
         if not where:
             where = None
-        result = self.store.select(self.localpath, where=where,
-                                   start=start_row, stop=end_row)
+            
+        result = store_select(self.store, self.localpath, where=where,
+                              start=start_row, stop=end_row)
         return result
 
     def cache_query(self, query_filter):
@@ -404,7 +406,8 @@ class FlexibleSqlCaching(BulkParameterizedQueryTable):
     def cache_info(self, query_filter):
         hashval = self.gethashval(query_filter)
         try:
-            result = self.store.select('cache_spec', where=[('hashval', hashval)])
+            result = store_select(self.store, 'cache_spec', 
+                                  where=[('hashval', hashval)])
         except KeyError:
             return None
         if result is None:
@@ -499,9 +502,9 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
         try:
 
             # print self.store['/cache_spec']
-
-            result = self.store.select('cache_spec', where=[('hashval', hashval),
-                                                            ('start_date',start_date)])
+            result = store_select(self.store, 'cache_spec', 
+                                  where=[('hashval', hashval),
+                                         ('start_date',start_date)])
             start_date = pd.Timestamp(start_date)
             end_date = pd.Timestamp(end_date)
 

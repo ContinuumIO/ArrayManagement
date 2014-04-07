@@ -16,7 +16,7 @@ import datetime as dt
 
 from ..exceptions import ArrayManagementException
 from ..pathutils import dirsplit
-from . import Node
+from . import Node, store_select
 import logging
 import math
 logger = logging.getLogger(__name__)
@@ -60,8 +60,8 @@ class HDFDataGroupMixin(object):
 
 class HDFDataSetMixin(object):
     def select(self, *args, **kwargs):
-        return self.store.select(self.localpath, *args, **kwargs)
-    
+        return store_select(self.store, self.localpath, *args, **kwargs)
+        
     def append(self, *args, **kwargs):
         return self.store.append(self.localpath, *args, **kwargs)
 
@@ -307,7 +307,7 @@ class PyTables(Node):
     def __init__(self, context, localpath="/"):
         super(PyTables, self).__init__(context)
         self.localpath = localpath
-        self.handle = tables.File(self.absolute_file_path)
+        self.handle = tables.File(self.absolute_file_path, mode="a")
         if self.localpath == "/":
             children = [x._v_pathname for x in self.handle.listNodes(self.localpath)]
             if children == ['/__data__']:
