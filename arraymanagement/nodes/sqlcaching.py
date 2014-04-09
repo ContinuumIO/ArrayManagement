@@ -13,7 +13,7 @@ from arraymanagement.nodes.hdfnodes import (PandasCacheableTable,
                                             write_pandas,
                                             override_hdf_types,
                                             )
-from arraymanagement.nodes.hdfnodes import Node
+from arraymanagement.nodes.hdfnodes import Node, store_select
 from arraymanagement.nodes.sql import query_info
 
 from sqlalchemy.sql.expression import bindparam, tuple_
@@ -83,7 +83,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
 
     def query_min_itemsize(self):
         try:
-            min_itemsize = self.store.select('min_itemsize')
+            min_itemsize = store_select(self.store, 'min_itemsize')
         except KeyError:
             return None
         return min_itemsize.to_dict()
@@ -151,7 +151,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         param_dict = self.parameter_dict(query_params)
         query = param_dict.items()
         try:
-            result = self.store.select('cache_spec', where=query)
+            result = store_select(self.store, 'cache_spec', where=query)
         except KeyError:
             return None
         if result is None:
@@ -272,10 +272,13 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
             self.cache_data(query_params)
             cache_info = self.cache_info(query_params)
         start_row, end_row = cache_info
+        #convert these series to ints
+        start_row = start_row[0]
+        end_row = end_row[0]
         if not where:
             where = None
-        result = self.store.select(self.localpath, where=where,
-                                   start=start_row, stop=end_row)
+        result = store_select(self.store, self.localpath, 
+                              where=where, start=start_row, stop=end_row)
         return result
     def repr_data(self):
         repr_data = super(DumbParameterizedQueryTable, self).repr_data()
@@ -310,8 +313,8 @@ class BulkParameterizedQueryTable(DumbParameterizedQueryTable):
         start_row, end_row = cache_info
         if not where:
             where = None
-        result = self.store.select(self.localpath, where=where,
-                                   start=start_row, stop=end_row)
+        result = store_select(self.store, self.localpath, 
+                              where=where, start=start_row, stop=end_row)
         return result
 
     def filter_sql(self, **kwargs):
@@ -337,7 +340,8 @@ class BulkParameterizedQueryTable(DumbParameterizedQueryTable):
         data = self.parameter_dict(query_params)
         hashval = gethashval(data)
         try:
-            result = self.store.select('cache_spec', where=[('hashval', hashval)])
+            result = store_select(self.store, 'cache_spec', 
+                                  where=[('hashval', hashval)])
         except KeyError:
             return None
         if result is None:
@@ -368,11 +372,10 @@ class FlexibleSqlCaching(BulkParameterizedQueryTable):
         if cache_info is None:
             self.cache_data(query_filter)
             cache_info = self.cache_info(query_filter)
+
         start_row, end_row = cache_info
-        if not where:
-            where = None
-        result = self.store.select(self.localpath, where=where,
-                                   start=start_row, stop=end_row)
+        result = store_select(self.store, self.localpath, where=where,
+                              start=start_row, stop=end_row)
         return result
 
     def cache_query(self, query_filter):
@@ -401,10 +404,13 @@ class FlexibleSqlCaching(BulkParameterizedQueryTable):
         write_pandas(self.store, 'cache_spec', data, {}, 1.1,
                      replace=False)
 
+
     def cache_info(self, query_filter):
         hashval = self.gethashval(query_filter)
         try:
-            result = self.store.select('cache_spec', where=[('hashval', hashval)])
+            #rewriting where statement for 0.13 pandas style
+            result = store_select(self.store, 'cache_spec',
+                                  where=[('hashval', hashval)])
         except KeyError:
             return None
         if result is None:
@@ -443,14 +449,13 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
                     setattr(self, name, column(name))
 
     def select(self, query_filter, where=None, **kwargs):
-
         ignore_cache = kwargs.get('IgnoreCache',None)
         if ignore_cache:
             query = self.compiled_query(query_filter,kwargs)
             return query
 
-
-        if 'date' not in kwargs.keys():
+        dateKeys = [k for k in kwargs.keys() if 'date' in k]
+        if not dateKeys:
             #no dates in query
 
             fs = FlexibleSqlCaching(self)
@@ -461,10 +466,8 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
             return result
 
         else:
-            dateKeys = [k for k in kwargs.keys() if 'date' in k]
             dateKeys = sorted(dateKeys)
             start_date, end_date = kwargs[dateKeys[0]], kwargs[dateKeys[1]]
-
 
             result = self.cache_info(query_filter,start_date, end_date)
 
@@ -497,11 +500,11 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
     def cache_info(self, query_filter, start_date, end_date):
         hashval = self.gethashval(query_filter)
         try:
-
             # print self.store['/cache_spec']
+            # result = store_select(self.store, 'cache_spec',
+            #                       where=[('hashval', hashval),
+            #                              ('start_date',start_date)])
 
-            result = self.store.select('cache_spec', where=[('hashval', hashval),
-                                                            ('start_date',start_date)])
             start_date = pd.Timestamp(start_date)
             end_date = pd.Timestamp(end_date)
 
@@ -559,7 +562,6 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
                 break;
 
         all_query = and_(query_params,column(col_date) >=start_date, column(col_date) <= end_date)
-
         q = self.cache_query(all_query)
         log.debug(str(q))
 
@@ -579,7 +581,6 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
             db_string_types=db_string_types,
             db_datetime_types=db_datetime_types
             )
-
         self.min_itemsize = min_itemsize
         self.finalize_min_itemsize()
         overrides = self.col_types
@@ -589,6 +590,7 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
             starting_row = self.table.nrows
         except AttributeError:
             starting_row = 0
+
         write_pandas_hdf_from_cursor(self.store, self.localpath, cur,
                                      columns, self.min_itemsize,
                                      dtype_overrides=overrides,
@@ -599,19 +601,17 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
             ending_row = self.table.nrows
         except AttributeError:
             ending_row = 0
-
         self.store_cache_spec(query_params, starting_row, ending_row, start_date, end_date)
 
 
     def munge_tables(self, hashval, start_date, end_date):
 
         store = self.store
-        store.select('cache_spec', where=[('hashval', hashval)])
+        # store.select('cache_spec', where=[('hashval', hashval)])
 
         store['/cache_spec'][['start_date','end_date']].sort(['start_date'])
-
-        df_min = store.select('cache_spec', where=[('start_date', '<=', start_date)]).reset_index()
-        df_max = store.select('cache_spec', where=[('end_date', '<=', end_date)]).reset_index()
+        df_min = store_select(store, 'cache_spec', where=[('start_date', '<=', start_date)]).reset_index()
+        df_max = store_select(store, 'cache_spec', where=[('end_date', '<=', end_date)]).reset_index()
 
         df_total = df_min.append(df_max)
         df_total.drop_duplicates('_end_row',inplace=True)
@@ -623,8 +623,7 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
         for s in ss_vals:
             start_row = s[0]
             end_row = s[1]
-
-            temp = store.select(self.localpath,
+            temp = store_select(store, self.localpath,
                                            start=start_row, stop=end_row)
             temp.head()
 

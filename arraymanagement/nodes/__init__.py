@@ -154,3 +154,73 @@ class Node(object):
             descendants = [x for x in descendants if not x.is_group]
         return descendants
         
+def store_select(pandas_store, key, where=None, **kwargs):
+    
+    if  "0.12" not in pd.__version__ and isinstance(where, list):
+        where = [parse_back_compat(x) for x in where]
+    # we used to accidentally pass series into start/stop
+    if 'start' in kwargs:
+        kwargs['start'] = int(kwargs['start'])
+    if 'stop' in kwargs:
+        kwargs['stop'] = int(kwargs['stop'])
+    return pandas_store.select(key, where=where, **kwargs)
+
+"""From pandas 
+"""
+def parse_back_compat(w, op=None, value=None):
+    import warnings
+    from pandas.computation.pytables import Expr
+    from pandas.compat import string_types
+    from datetime import datetime, timedelta
+    import numpy as np
+
+    """ allow backward compatibility for passed arguments """
+
+    if isinstance(w, dict):
+        w, op, value = w.get('field'), w.get('op'), w.get('value')
+        if not isinstance(w, string_types):
+            raise TypeError(
+                "where must be passed as a string if op/value are passed")
+        warnings.warn("passing a dict to Expr is deprecated, "
+                      "pass the where as a single string",
+                      DeprecationWarning)
+    if isinstance(w, tuple):
+        if len(w) == 2:
+            w, value = w
+            op = '=='
+        elif len(w) == 3:
+            w, op, value = w
+        warnings.warn("passing a tuple into Expr is deprecated, "
+                      "pass the where as a single string",
+                      DeprecationWarning)
+
+    if op is not None:
+        if not isinstance(w, string_types):
+            raise TypeError(
+                "where must be passed as a string if op/value are passed")
+
+        if isinstance(op, Expr):
+            raise TypeError("invalid op passed, must be a string")
+        w = "{0}{1}".format(w, op)
+        if value is not None:
+            if isinstance(value, Expr):
+                raise TypeError("invalid value passed, must be a string")
+
+            # stringify with quotes these values
+            def convert(v):
+                if isinstance(v, (basestring, datetime,np.datetime64,timedelta,np.timedelta64)) or hasattr(v, 'timetuple'):
+                    return "'{0}'".format(str(v))
+                return v
+
+            if isinstance(value, (list,tuple)):
+                value = [ convert(v) for v in value ]
+            else:
+                value = convert(value)
+
+            w = "{0}{1}".format(w, value)
+
+        warnings.warn("passing multiple values to Expr is deprecated, "
+                      "pass the where as a single string",
+                      DeprecationWarning)
+
+    return w
