@@ -15,7 +15,7 @@ if len(sys.argv)>1 and sys.argv[1] == 'develop':
 from distutils.core import setup
 import os
 import sys
-__version__ = (0, 0, 1)
+__version__ = (0, 1)
 setup(
     name = 'arraymanagement',
     version = '.'.join([str(x) for x in __version__]),
