@@ -272,6 +272,9 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
             self.cache_data(query_params)
             cache_info = self.cache_info(query_params)
         start_row, end_row = cache_info
+        #convert these series to ints
+        start_row = start_row[0]
+        end_row = end_row[0]
         if not where:
             where = None
         result = store_select(self.store, self.localpath, 
@@ -371,10 +374,8 @@ class FlexibleSqlCaching(BulkParameterizedQueryTable):
             cache_info = self.cache_info(query_filter)
 
         start_row, end_row = cache_info
-
-        #removed start_row, end_row
-        result = store_select(self.store, self.localpath, where=where)
-        #                      start=start_row, stop=end_row)
+        result = store_select(self.store, self.localpath, where=where,
+                              start=start_row, stop=end_row)
         return result
 
     def cache_query(self, query_filter):
@@ -409,7 +410,7 @@ class FlexibleSqlCaching(BulkParameterizedQueryTable):
         try:
             #rewriting where statement for 0.13 pandas style
             result = store_select(self.store, 'cache_spec',
-                                  where='hashval=="{}"'.format(hashval))
+                                  where=[('hashval', hashval)])
         except KeyError:
             return None
         if result is None:

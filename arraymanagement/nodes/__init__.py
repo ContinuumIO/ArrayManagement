@@ -155,18 +155,25 @@ class Node(object):
         return descendants
         
 def store_select(pandas_store, key, where=None, **kwargs):
-    if isinstance(where, list):
+    
+    if  "0.12" not in pd.__version__ and isinstance(where, list):
         where = [parse_back_compat(x) for x in where]
+    # we used to accidentally pass series into start/stop
+    if 'start' in kwargs:
+        kwargs['start'] = int(kwargs['start'])
+    if 'stop' in kwargs:
+        kwargs['stop'] = int(kwargs['stop'])
     return pandas_store.select(key, where=where, **kwargs)
 
 """From pandas 
 """
-import warnings
-from pandas.computation.pytables import Expr
-from pandas.compat import string_types
-from datetime import datetime, timedelta
-import numpy as np
 def parse_back_compat(w, op=None, value=None):
+    import warnings
+    from pandas.computation.pytables import Expr
+    from pandas.compat import string_types
+    from datetime import datetime, timedelta
+    import numpy as np
+
     """ allow backward compatibility for passed arguments """
 
     if isinstance(w, dict):
@@ -201,7 +208,7 @@ def parse_back_compat(w, op=None, value=None):
 
             # stringify with quotes these values
             def convert(v):
-                if isinstance(v, (datetime,np.datetime64,timedelta,np.timedelta64)) or hasattr(v, 'timetuple'):
+                if isinstance(v, (basestring, datetime,np.datetime64,timedelta,np.timedelta64)) or hasattr(v, 'timetuple'):
                     return "'{0}'".format(str(v))
                 return v
 
