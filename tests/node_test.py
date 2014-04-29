@@ -66,9 +66,13 @@ def test_sql_yaml_cache():
 
     date_1 = dt.datetime(2000,1,1)
     date_2 = dt.datetime(2003,12,30)
-    aapl = arr.select(and_(arr.ticker=='AAPL'),date_1 = date_1 , date_2 = date_2)
+    aapl = arr.select(and_(arr.ticker=='AAPL'),date_1 = date_1, \
+                      date_2 = date_2)
 
-    query = arr.select(and_(arr.ticker=='AAPL'),date_1 = date_1 , date_2 = date_2, IgnoreCache=True)
+    data = arr.select(and_(arr.ticker=='AAPL'),date_1 = date_1, \
+                       date_2 = date_2, IgnoreCache=True)
+
+    print data
 
     query = arr.select(and_(arr.ticker=='AAPL'), IgnoreCache=True)
 

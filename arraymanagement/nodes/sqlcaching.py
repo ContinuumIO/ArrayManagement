@@ -452,7 +452,18 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
         ignore_cache = kwargs.get('IgnoreCache',None)
         if ignore_cache:
             query = self.compiled_query(query_filter,kwargs)
-            return query
+            log.debug("Ignore Caching")
+            log.debug(str(query))
+
+            cur = self.session.execute(query)
+
+            #fetch all data and load in a dataframe
+            data = cur.fetchall()
+            columns = [c[0] for c in cur._cursor_description()]
+            df = pd.DataFrame.from_records(data, columns=columns)
+
+            return df
+
 
         dateKeys = [k for k in kwargs.keys() if 'date' in k]
         if not dateKeys:
@@ -673,7 +684,7 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
         if 'date' not in kwargs.keys():
             all_query = and_(query_params)
             result = self.cache_query(all_query)
-            return str(result)
+            return result
 
         else:
             dateKeys = [k for k in kwargs.keys() if 'date' in k]
@@ -689,4 +700,4 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
 
             result = self.cache_query(all_query)
 
-            return str(result)
+            return result
