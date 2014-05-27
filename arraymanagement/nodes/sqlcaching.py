@@ -508,6 +508,16 @@ class YamlSqlDateCaching(BulkParameterizedQueryTable):
             start_date = pd.Timestamp(start_date)
             end_date = pd.Timestamp(end_date)
 
+            cache_spec = self.store['cache_spec']
+            cache_spec = cache_spec[cache_spec.hashval == hashval]
+
+            if len(cache_spec) == 0: return None
+
+            max_date = cache_spec['end_date'].max()
+            min_date = cache_spec['start_date'].min()
+            start_date = pd.Timestamp(start_date)
+            end_date = pd.Timestamp(end_date)
+
             max_date = self.store['/cache_spec']['end_date'].max()
             min_date = self.store['/cache_spec']['start_date'].min()
 
