@@ -1,16 +1,20 @@
 #import databag
 import os
 from os.path import join, dirname, isdir, relpath, exists, abspath
-from config import NodeConfig
-import pathutils
-from nodes.dirnodes import DirectoryNode
-from nodes import Node, NodeContext
-import default_loader
+
+from .config import NodeConfig
+
+from . import default_loader
+from . import pathutils
+
+from .nodes.dirnodes import DirectoryNode
+from .nodes import Node, NodeContext
 import sys
 import os
 import shutil
 from . import clear_mem_cache
-from arraymanagement.logger import log
+from .logger import log
+from imp import reload
 
 class ArrayClient(Node):
     #should modify this to inherit from DirectorNode
@@ -58,8 +62,8 @@ class ArrayClient(Node):
                             parent_config,
                             self.raw_config.local_config.get(urlpath, {}))
         return config
-        
-        
+
+
     def get_node(self, urlpath):
         if not urlpath.startswith("/"):
             urlpath = "/" + urlpath
@@ -74,7 +78,7 @@ class ArrayClient(Node):
 
     def keys(self):
         return self.get_node('/').keys()
-    
+
     def clear_mem_cache(self):
         clear_mem_cache()
 
@@ -95,7 +99,7 @@ class ArrayClient(Node):
         for dirpath, dirnames, filenames in os.walk(path):
             if os.path.split(dirpath)[-1] == ".cache":
                 shutil.rmtree(dirpath)
-                
-        
 
-    
+
+
+

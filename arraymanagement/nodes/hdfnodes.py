@@ -74,7 +74,7 @@ class HDFDataSetMixin(object):
                 node._v_attrs.pandas_type == 'frame_table':
             return node.table
         else:
-            raise Exception, "node does not have a table in it"
+            raise Exception("node does not have a table in it")
 
 pandas_hdf5_cache = {}
 

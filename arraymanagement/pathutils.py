@@ -1,7 +1,7 @@
 from os.path import join, dirname, split, realpath, exists, abspath
 import imp
 import posixpath
-from serializations import jsload
+from .serializations import jsload
 
 def urlsplit(path, basepath, maxdepth=10):
     """splits /home/hugo/foo/bar/baz into foo, bar, baz, assuming
