@@ -4,14 +4,14 @@ from os.path import join, dirname, exists
 import posixpath
 import copy
 import collections
-from nodes import csvnodes
-from nodes import hdfnodes
-from nodes import dirnodes
-from nodes import sql
+from .nodes import csvnodes
+from .nodes import hdfnodes
+from .nodes import dirnodes
+from .nodes import sql
 
 #import databag
 
-from pathutils import recursive_config_load, get_config
+from .pathutils import recursive_config_load, get_config
 import collections
 
 def ordered_dict_merge(first, second):
@@ -36,7 +36,9 @@ def config_dict_update(old_config, new_config):
     also updates all dicts inside new_config with the same dicts in old_config
     """
     new = {}
-    keys = set(old_config.keys() + new_config.keys())
+
+    keys = set(list(old_config.keys()) + list(new_config.keys()))
+
     for k in keys:
         if k in old_config and k in new_config and \
                 isinstance(old_config[k], dict) and \
@@ -62,7 +64,7 @@ def config_dict_update(old_config, new_config):
 #         '*.sql' : sql.SimpleQueryTable,
 #         },
 #     pattern_priority = []
-#     )            
+#     )
 
 class NodeConfig(object):
     def __init__(self, url, parent_config, local_config):
@@ -77,4 +79,4 @@ class NodeConfig(object):
     def get(self, key, default=None):
         return self.config.get(key, getattr(self, key, default))
 
-        
+

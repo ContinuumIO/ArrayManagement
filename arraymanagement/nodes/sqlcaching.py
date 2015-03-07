@@ -6,15 +6,15 @@ import pandas as pd
 from pandas.io import sql
 import json
 import itertools
-import cPickle as pickle
+import pickle
 import hashlib
-from arraymanagement.nodes.hdfnodes import (PandasCacheableTable, 
+from .nodes.hdfnodes import (PandasCacheableTable,
                                             write_pandas_hdf_from_cursor,
                                             write_pandas,
                                             override_hdf_types,
                                             )
-from arraymanagement.nodes.hdfnodes import Node, store_select
-from arraymanagement.nodes.sql import query_info
+from .nodes.hdfnodes import Node, store_select
+from .nodes.sql import query_info
 
 from sqlalchemy.sql.expression import bindparam, tuple_
 from sqlalchemy.sql import column, and_
@@ -22,7 +22,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
-from arraymanagement.logger import log
+from .logger import log
 
 import yaml
 import tables
@@ -37,38 +37,38 @@ warnings.filterwarnings('ignore',category=tables.NaturalNameWarning)
 
 class DumbParameterizedQueryTable(PandasCacheableTable):
     config_fields = ['query',
-                     
+
                      #args to pass into connect
                      'sqlalchemy_args',
-                     
-                     #args to pass into connect                     
+
+                     #args to pass into connect
                      'sqlalchemy_kwargs',
-                     
+
                      #types in cursor description which represent
                      'db_string_types',
-                     
+
                      #types in cursor description which are datetime types
                      'db_datetime_types',
-                     
+
                      #column name to type mappings
                      'col_types',
-                     
-                     # minimum column sizes 
+
+                     # minimum column sizes
                      'min_itemsize',
-                     
+
                      'cache_discrete_fields',
-                     
+
                      'cache_continuous_fields',
                      ]
-    
+
     def __init__(self, *args, **kwargs):
         super(DumbParameterizedQueryTable, self).__init__(*args, **kwargs)
         if self.query is None:
             self.init_from_file()
-        self.engine = create_engine(*self.sqlalchemy_args, 
+        self.engine = create_engine(*self.sqlalchemy_args,
                                     **self.sqlalchemy_kwargs)
         self.session = sessionmaker(bind=self.engine)()
-        
+
     def init_from_file(self):
         with open(join(self.basepath, self.relpath)) as f:
             data = f.read()
@@ -87,7 +87,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         except KeyError:
             return None
         return min_itemsize.to_dict()
-    
+
     @property
     def min_itemsize(self):
         min_itemsize = self.query_min_itemsize()
@@ -96,7 +96,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         else:
             min_itemsize.pop('finalized', None)
             return min_itemsize
-    
+
     @min_itemsize.setter
     def min_itemsize(self, val):
         if val is None:
@@ -116,7 +116,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         min_itemsize = self.query_min_itemsize()
         min_itemsize['finalized'] = True
         self.min_itemsize = min_itemsize
-        
+
     def cache_spec_min_itemsize(self):
         min_itemsize = self.min_itemsize.copy()
         output = {}
@@ -146,7 +146,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         data = override_hdf_types(data, overrides)
         write_pandas(self.store, 'cache_spec', data, min_itemsize, 1.1,
                      replace=False)
-        
+
     def cache_info(self, query_params):
         param_dict = self.parameter_dict(query_params)
         query = param_dict.items()
@@ -170,7 +170,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
             output[field + "_start"] = query_params[field][0]
             output[field + "_end"] = query_params[field][1]
         return output
-    
+
     def filter_sql(self, **kwargs):
         clauses = []
         for field in self.cache_discrete_fields:
@@ -180,25 +180,25 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
             clauses.append(column(field) >= val_range[0])
             clauses.append(column(field) <= val_range[1])
         return and_(*clauses)
-    
+
     def cache_query(self, query_params):
         q = """ * from (%s) as X """
         q = q % self.query
         filter_clause = self.filter_sql(**query_params)
         query = self.session.query(q).filter(filter_clause)
         return query
-    
+
     def cache_data(self, query_params):
         q = self.cache_query(query_params)
         log.debug(str(q))
 
 
         cur = self.session.execute(q)
-        
+
         min_itemsize = self.min_itemsize if self.min_itemsize else {}
         db_string_types = self.db_string_types if self.db_string_types else []
         db_datetime_types = self.db_datetime_types if self.db_datetime_types else []
-        
+
         #hack
         cur.description = cur._cursor_description()
         cur.arraysize = 500
@@ -209,7 +209,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
             db_string_types=db_string_types,
             db_datetime_types=db_datetime_types
             )
-        
+
         self.min_itemsize = min_itemsize
         self.finalize_min_itemsize()
         overrides = self.col_types
@@ -219,11 +219,11 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
             starting_row = self.table.nrows
         except AttributeError:
             starting_row = 0
-        write_pandas_hdf_from_cursor(self.store, self.localpath, cur, 
-                                     columns, self.min_itemsize, 
+        write_pandas_hdf_from_cursor(self.store, self.localpath, cur,
+                                     columns, self.min_itemsize,
                                      dtype_overrides=overrides,
                                      min_item_padding=self.min_item_padding,
-                                     chunksize=50000, 
+                                     chunksize=50000,
                                      replace=False)
         try:
             ending_row = self.table.nrows
@@ -233,7 +233,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
 
     def load_data(self):
         raise NotImplementedError
-    
+
     def hdfstore_selection(self, **kwargs):
         where = []
         for field in self.cache_discrete_fields:
@@ -244,7 +244,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
             where.append(field, "<=", val_range[1])
         where += kwargs.pop('where', [])
         return where
-    
+
     def select(self, **kwargs):
         for field in self.cache_discrete_fields:
             if not isinstance(kwargs.get(field), (list, tuple, np.ndarray)):
@@ -277,7 +277,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         end_row = end_row[0]
         if not where:
             where = None
-        result = store_select(self.store, self.localpath, 
+        result = store_select(self.store, self.localpath,
                               where=where, start=start_row, stop=end_row)
         return result
     def repr_data(self):
@@ -293,7 +293,7 @@ class DumbParameterizedQueryTable(PandasCacheableTable):
         cmd = "select(%s)" % args
         repr_data.append("syntax: %s" % cmd)
         return repr_data
-    
+
 def gethashval(obj):
     m = hashlib.md5()
     m.update(pickle.dumps(obj))
@@ -313,7 +313,7 @@ class BulkParameterizedQueryTable(DumbParameterizedQueryTable):
         start_row, end_row = cache_info
         if not where:
             where = None
-        result = store_select(self.store, self.localpath, 
+        result = store_select(self.store, self.localpath,
                               where=where, start=start_row, stop=end_row)
         return result
 
@@ -326,21 +326,21 @@ class BulkParameterizedQueryTable(DumbParameterizedQueryTable):
             clauses.append(column(field) >= val_range[0])
             clauses.append(column(field) <= val_range[1])
         return and_(*clauses)
-        
+
     def store_cache_spec(self, query_params, start_row, end_row):
         data = self.parameter_dict(query_params)
         hashval = gethashval(data)
-        data = pd.DataFrame({'hashval' : [hashval], 
+        data = pd.DataFrame({'hashval' : [hashval],
                              '_start_row' : start_row,
                              '_end_row' : end_row})
         write_pandas(self.store, 'cache_spec', data, {}, 1.1,
                      replace=False)
-        
+
     def cache_info(self, query_params):
         data = self.parameter_dict(query_params)
         hashval = gethashval(data)
         try:
-            result = store_select(self.store, 'cache_spec', 
+            result = store_select(self.store, 'cache_spec',
                                   where=[('hashval', hashval)])
         except KeyError:
             return None

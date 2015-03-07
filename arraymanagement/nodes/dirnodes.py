@@ -5,7 +5,7 @@ import pandas as pd
 from ..exceptions import ArrayManagementException
 import fnmatch
 import sys
-from hdfnodes import get_pandas_hdf5, write_pandas
+from .hdfnodes import get_pandas_hdf5, write_pandas
 from . import Node
 from .. import pathutils
 
@@ -54,7 +54,7 @@ def get_node(key, context):
         #DEPRECATE THIS..
         files = [x for x in files if splitext(x)[0] == key]
         if len (files) > 1:
-            raise ArrayManagementException, 'multile files matching %s: %s' % (key, str(files))
+            raise ArrayManagementException('multile files matching {}: {}'.format(key, str(files)))
         if len(files) == 1:
             #hack
             fname = files[0]

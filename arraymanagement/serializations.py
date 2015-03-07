@@ -1,6 +1,10 @@
 from os.path import join, dirname, split, realpath, exists
 import json
-import cPickle
+
+try:
+    import cPickle
+except:
+    import pickle as cPickle
 
 def jsload(path):
     with open(path) as f:
